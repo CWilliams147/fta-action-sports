@@ -1,0 +1,30 @@
+# FTA Action Sports - Global Project Rules
+
+## 1. BRAND IDENTITY & AESTHETIC
+
+- **Name:** FTA Action Sports (Forget the Algorithm).
+- **Vibe:** Raw, authentic, high-contrast, "Brutalist" design.
+- **Visuals:** Use Tailwind CSS. Stick to Black (#000000), "Paper" White (#F4F4F4), and "Safety Orange" (#FF5F1F) for accents.
+- **UI:** Sharp edges (no rounded corners), bold borders (2px+), and large, heavy sans-serif typography. Avoid soft shadows or "corporate" gradients.
+
+## 2. DYNAMIC SPORT LOGIC (Updated)
+
+When building profile forms or database schemas, the technical spec field must adapt:
+
+- **Board Sports (Skateboard, Surf, Snowboard):** Field = "Stance" (Options: Regular, Goofy).
+- **Bike Sports (BMX, MTB):** Field = "Foot Forward" (Options: Left, Right).
+- **Skiing:** Hide stance field. Replace with "Primary Style" (Options: Park/Pipe, Big Mountain, Backcountry).
+- **Moto:** Field = "Discipline" (Options: Freestyle, Racing, Enduro).
+
+## 3. TECH STACK PREFERENCES
+
+- **Framework:** Next.js (App Router).
+- **Styling:** Tailwind CSS.
+- **Backend/Database:** Supabase (PostgreSQL).
+- **Components:** Clean, functional, server-side where possible.
+
+## 4. THE "FTA" PHILOSOPHY
+
+- Prioritize "Clip Catalogs" over "Feeds."
+- All data should be searchable and filterable for "Brand" accounts.
+- Design for "The Vouch" system instead of a traditional "Like" system.
