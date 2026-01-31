@@ -3,7 +3,7 @@
  * .cursorrules: Board (Skateboard, Surf, Snowboard) = Stance; Skiing = Primary Style; Bike = Foot Forward; Moto = Discipline.
  */
 
-export type AccountType = "athlete" | "brand";
+export type AccountType = "athlete" | "brand" | "creative";
 
 export type SportCategory = "board" | "bike" | "motor_other";
 
@@ -53,6 +53,13 @@ export interface Profile {
   twitter: string | null;
   youtube: string | null;
   scouting_status: ScoutingStatusType | null;
+  /** Creative-only */
+  equipment_list: string[] | null;
+  specialties: string[] | null;
+  day_rate: number | null;
+  youtube_portfolio: string | null;
+  vimeo_portfolio: string | null;
+  behance_portfolio: string | null;
 }
 
 /** Clip Catalog: one clip per row, linked to profile */
@@ -88,6 +95,14 @@ export interface Watchlist {
   id: string;
   brand_id: string;
   athlete_id: string;
+  created_at: string;
+}
+
+/** Creative Vouch: voter vouches for a filmer (one per creative) */
+export interface CreativeVouch {
+  id: string;
+  voter_id: string;
+  creative_id: string;
   created_at: string;
 }
 
@@ -274,6 +289,12 @@ export const SCOUTING_STATUS_OPTIONS: {
   { value: "monitoring", label: "Monitoring", displayLabel: "MONITORING", buttonClass: "border-fta-black bg-[#9ca3af] text-fta-black" },
   { value: "roster_full", label: "Roster full", displayLabel: "ROSTER FULL", buttonClass: "border-fta-black bg-fta-black text-fta-paper" },
 ];
+
+/** Creative: specialties (Video, Photo, Drone) for directory filter */
+export const CREATIVE_SPECIALTIES = ["Video", "Photo", "Drone"] as const;
+
+/** Creative: equipment list options (Camera, Drone, etc.) */
+export const CREATIVE_EQUIPMENT_OPTIONS = ["Camera", "Drone", "Gimbal", "Underwater", "Other"] as const;
 
 /** Whether this sport name uses Stance (Regular/Goofy) */
 export function sportUsesStance(sportName: string): boolean {

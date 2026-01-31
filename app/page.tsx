@@ -21,6 +21,12 @@ export default function HomePage() {
           Discovery
         </Link>
         <Link
+          href="/creatives"
+          className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors"
+        >
+          Filmer Directory
+        </Link>
+        <Link
           href="/auth/sign-in"
           className="px-6 py-3 border-2 border-fta-black bg-fta-black text-fta-paper font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors"
         >

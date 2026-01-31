@@ -31,8 +31,8 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
     .eq("username", username)
     .single();
   if (!profile) return { title: "Profile | FTA Action Sports" };
-  const name = profile.display_name || (profile.account_type === "brand" ? "Brand" : "Athlete");
-  const suffix = profile.account_type === "brand" ? " · Brand" : profile.sport_name ? ` · ${profile.sport_name}` : "";
+  const name = profile.display_name || (profile.account_type === "brand" ? "Brand" : profile.account_type === "creative" ? "Creative" : "Athlete");
+  const suffix = profile.account_type === "brand" ? " · Brand" : profile.account_type === "creative" ? " · Creative" : profile.sport_name ? ` · ${profile.sport_name}` : "";
   return { title: `${name}${suffix} | FTA Action Sports` };
 }
 
@@ -61,6 +61,35 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         email_public={profile.email_public}
         twitter={profile.twitter}
         youtube={profile.youtube}
+        isOwnProfile={user?.id === profile.id}
+      />
+    );
+  }
+
+  if (profile.account_type === "creative") {
+    const { data: vouchRows } = await supabase
+      .from("creative_vouches")
+      .select("voter_id")
+      .eq("creative_id", profile.id);
+    const vouchesCount = vouchRows?.length ?? 0;
+    const userHasVouched = !!user?.id && (vouchRows ?? []).some((r: { voter_id: string }) => r.voter_id === user.id);
+    const { CreativeHub: CreativeHubView } = await import("@/components/CreativeHub");
+    return (
+      <CreativeHubView
+        display_name={profile.display_name}
+        username={profile.username}
+        bio={profile.bio}
+        home_town={profile.home_town}
+        equipment_list={profile.equipment_list}
+        specialties={profile.specialties}
+        day_rate={profile.day_rate}
+        youtube_portfolio={profile.youtube_portfolio}
+        vimeo_portfolio={profile.vimeo_portfolio}
+        behance_portfolio={profile.behance_portfolio}
+        creativeId={profile.id}
+        vouchesCount={vouchesCount}
+        userHasVouched={userHasVouched}
+        currentUserId={user?.id ?? null}
         isOwnProfile={user?.id === profile.id}
       />
     );

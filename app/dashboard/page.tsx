@@ -29,7 +29,7 @@ export default async function DashboardPage() {
           FTA Action Sports
         </h1>
         <p className="text-fta-black/80 mt-2">
-          {profile.account_type === "athlete" ? "Athlete" : "Brand"} dashboard
+          {profile.account_type === "athlete" ? "Athlete" : profile.account_type === "brand" ? "Brand" : "Creative"} dashboard
           {profile.account_type === "athlete" && profile.sport_name && (
             <> · {profile.sport_name}</>
           )}
@@ -53,6 +53,30 @@ export default async function DashboardPage() {
       <p className="text-fta-black/80 mb-6">
         Signed in as {user.email}. Clip catalogs and The Vouch coming next.
       </p>
+      {profile.account_type === "creative" && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Link
+            href="/creatives"
+            className="px-6 py-3 border-2 border-fta-black bg-fta-orange text-fta-black font-bold hover:bg-fta-paper hover:border-fta-orange transition-colors rounded-none"
+          >
+            Filmer Directory
+          </Link>
+          <Link
+            href="/dashboard/profile/edit"
+            className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
+          >
+            Edit profile
+          </Link>
+          {profile.username ? (
+            <Link
+              href={`/profile/${profile.username}`}
+              className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
+            >
+              My Profile
+            </Link>
+          ) : null}
+        </div>
+      )}
       {profile.account_type === "brand" && (
         <div className="flex flex-wrap gap-2 mb-6">
           <Link

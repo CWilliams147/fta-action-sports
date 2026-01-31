@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SiteNav } from "@/components/SiteNav";
 
 export const metadata: Metadata = {
   title: "FTA Action Sports",
@@ -14,6 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen font-sans antialiased">
+        <SiteNav />
         {children}
       </body>
     </html>

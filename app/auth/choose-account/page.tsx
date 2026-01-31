@@ -19,7 +19,7 @@ export default function ChooseAccountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
-  async function handleChoose(accountType: "athlete" | "brand") {
+  async function handleChoose(accountType: "athlete" | "brand" | "creative") {
     setLoading(accountType);
     setMessage(null);
     const { data: { user } } = await supabase.auth.getUser();
@@ -69,6 +69,14 @@ export default function ChooseAccountPage() {
           className="w-full px-6 py-6 border-2 border-fta-black bg-fta-black text-fta-paper font-bold text-lg hover:bg-fta-orange hover:border-fta-orange transition-colors disabled:opacity-50"
         >
           {loading === "brand" ? "…" : "Brand"}
+        </button>
+        <button
+          type="button"
+          onClick={() => handleChoose("creative")}
+          disabled={!!loading}
+          className="w-full px-6 py-6 border-2 border-fta-black bg-fta-paper text-fta-black font-bold text-lg hover:bg-fta-orange hover:border-fta-orange transition-colors disabled:opacity-50"
+        >
+          {loading === "creative" ? "…" : "Creative"}
         </button>
       </div>
       {message && (

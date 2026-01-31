@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SportDropdown } from "@/components/SportDropdown";
 import { UploadClips } from "@/components/UploadClips";
 import { BrandEditForm } from "@/components/BrandEditForm";
+import { CreativeEditForm } from "@/components/CreativeEditForm";
 import {
   type StanceType,
   type ScoutingStatusType,
@@ -50,6 +51,18 @@ export default function EditProfilePage() {
     youtube: string;
     scouting_status: ScoutingStatusType | null;
   } | null>(null);
+  const [creativeInitial, setCreativeInitial] = useState<{
+    display_name: string;
+    username: string;
+    bio: string;
+    home_town: string;
+    equipment_list: string[];
+    specialties: string[];
+    day_rate: string;
+    youtube_portfolio: string;
+    vimeo_portfolio: string;
+    behance_portfolio: string;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -82,6 +95,21 @@ export default function EditProfilePage() {
             twitter: profile.twitter ?? "",
             youtube: profile.youtube ?? "",
             scouting_status: profile.scouting_status ?? null,
+          });
+          return;
+        }
+        if (profile.account_type === "creative") {
+          setCreativeInitial({
+            display_name: profile.display_name ?? "",
+            username: profile.username ?? "",
+            bio: profile.bio ?? "",
+            home_town: profile.home_town ?? "",
+            equipment_list: Array.isArray(profile.equipment_list) ? profile.equipment_list : [],
+            specialties: Array.isArray(profile.specialties) ? profile.specialties : [],
+            day_rate: profile.day_rate != null ? String(profile.day_rate) : "",
+            youtube_portfolio: profile.youtube_portfolio ?? "",
+            vimeo_portfolio: profile.vimeo_portfolio ?? "",
+            behance_portfolio: profile.behance_portfolio ?? "",
           });
           return;
         }
@@ -168,6 +196,37 @@ export default function EditProfilePage() {
     return (
       <main className="min-h-screen p-8 border-2 border-fta-black">
         <p className="text-fta-black/80">Loading…</p>
+      </main>
+    );
+  }
+
+  if (accountType === "creative" && creativeInitial && profileId) {
+    return (
+      <main className="min-h-screen p-8 border-2 border-fta-black">
+        <header className="border-b-2 border-fta-black pb-4 mb-8">
+          <h1 className="text-3xl font-bold tracking-tight border-b-2 border-fta-orange pb-2 inline-block">
+            Edit Creative Profile
+          </h1>
+          <p className="text-fta-black/80 mt-2">Equipment, specialties, portfolio, day rate.</p>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link href="/dashboard" className="text-sm font-bold text-fta-orange hover:underline">
+              ← Dashboard
+            </Link>
+            {creativeInitial.username && (
+              <Link
+                href={`/profile/${creativeInitial.username}`}
+                className="text-sm font-bold text-fta-orange hover:underline"
+              >
+                View profile
+              </Link>
+            )}
+          </div>
+        </header>
+        <CreativeEditForm
+          profileId={profileId}
+          initial={creativeInitial}
+          onSaved={() => router.refresh()}
+        />
       </main>
     );
   }
