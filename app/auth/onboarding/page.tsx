@@ -28,10 +28,10 @@ export default function OnboardingPage() {
   const [sportOpen, setSportOpen] = useState(false);
   const sportRef = useRef<HTMLDivElement>(null);
   const [stance, setStance] = useState<StanceType | "">("");
-  const [snowStyle, setSnowStyle] = useState<SnowStyleType | "">("");
-  const [skateStyle, setSkateStyle] = useState<SkateStyleType | "">("");
+  const [snowStyles, setSnowStyles] = useState<SnowStyleType[]>([]);
+  const [skateStyles, setSkateStyles] = useState<SkateStyleType[]>([]);
   const [footForward, setFootForward] = useState<FootForwardType | "">("");
-  const [discipline, setDiscipline] = useState<DisciplineType | "">("");
+  const [disciplines, setDisciplines] = useState<DisciplineType[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const router = useRouter();
@@ -74,20 +74,20 @@ export default function OnboardingPage() {
       setMessage("Pick your stance.");
       return;
     }
-    if (sportUsesSnowStyle(sportName) && !snowStyle) {
-      setMessage("Pick your snow style.");
+    if (sportUsesSnowStyle(sportName) && snowStyles.length === 0) {
+      setMessage("Pick at least one snow style.");
       return;
     }
-    if (sportUsesSkateStyle(sportName) && !skateStyle) {
-      setMessage("Pick your style.");
+    if (sportUsesSkateStyle(sportName) && skateStyles.length === 0) {
+      setMessage("Pick at least one style.");
       return;
     }
     if (sportUsesFootForward(sportName) && !footForward) {
       setMessage("Pick your foot forward.");
       return;
     }
-    if (sportUsesDiscipline(sportName) && !discipline) {
-      setMessage("Pick your discipline.");
+    if (sportUsesDiscipline(sportName) && disciplines.length === 0) {
+      setMessage("Pick at least one discipline.");
       return;
     }
     setLoading(true);
@@ -112,10 +112,10 @@ export default function OnboardingPage() {
       updated_at: new Date().toISOString(),
     };
     if (sportUsesStance(sportName)) payload.stance = stance;
-    if (sportUsesSnowStyle(sportName)) payload.snow_style = snowStyle;
-    if (sportUsesSkateStyle(sportName)) payload.skate_style = skateStyle;
+    if (sportUsesSnowStyle(sportName)) payload.snow_styles = snowStyles;
+    if (sportUsesSkateStyle(sportName)) payload.skate_styles = skateStyles;
     if (sportUsesFootForward(sportName)) payload.foot_forward = footForward;
-    if (sportUsesDiscipline(sportName)) payload.discipline = discipline;
+    if (sportUsesDiscipline(sportName)) payload.disciplines = disciplines;
     const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
     setLoading(false);
     if (error) {
@@ -163,10 +163,10 @@ export default function OnboardingPage() {
                   onClick={() => {
                     setSportName(s.name);
                     setStance("");
-                    setSnowStyle("");
-                    setSkateStyle("");
+                    setSnowStyles([]);
+                    setSkateStyles([]);
                     setFootForward("");
-                    setDiscipline("");
+                    setDisciplines([]);
                     setSportOpen(false);
                   }}
                   className={`px-4 py-2 border-b-2 border-fta-black last:border-b-0 font-bold cursor-pointer hover:bg-fta-orange hover:text-fta-black rounded-none ${sportName === s.name ? "bg-fta-orange text-fta-black" : "bg-fta-paper text-fta-black"}`}
@@ -200,19 +200,19 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Skateboard: Style (Street, Vert, Park, Freestyle, Downhill) */}
+        {/* Skateboard: Style (multi-select) */}
         {sportUsesSkateStyle(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Style</label>
+            <label className="block text-sm font-bold mb-2">Styles (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {SKATE_STYLE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="skate_style"
+                    type="checkbox"
+                    name="skate_styles"
                     value={opt.value}
-                    checked={skateStyle === opt.value}
-                    onChange={() => setSkateStyle(opt.value)}
+                    checked={skateStyles.includes(opt.value)}
+                    onChange={() => setSkateStyles((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -222,19 +222,19 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Skiing & Snowboarding: Snow style (Park/Pipe, Big Mountain, Backcountry) */}
+        {/* Skiing & Snowboarding: Snow style (multi-select) */}
         {sportUsesSnowStyle(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Snow style</label>
+            <label className="block text-sm font-bold mb-2">Snow styles (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {SNOW_STYLE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="snow_style"
+                    type="checkbox"
+                    name="snow_styles"
                     value={opt.value}
-                    checked={snowStyle === opt.value}
-                    onChange={() => setSnowStyle(opt.value)}
+                    checked={snowStyles.includes(opt.value)}
+                    onChange={() => setSnowStyles((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -266,19 +266,19 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Moto: Discipline (Freestyle, Racing, Enduro) */}
+        {/* Moto: Discipline (multi-select) */}
         {sportUsesDiscipline(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Discipline</label>
+            <label className="block text-sm font-bold mb-2">Disciplines (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {DISCIPLINE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="discipline"
+                    type="checkbox"
+                    name="disciplines"
                     value={opt.value}
-                    checked={discipline === opt.value}
-                    onChange={() => setDiscipline(opt.value)}
+                    checked={disciplines.includes(opt.value)}
+                    onChange={() => setDisciplines((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -293,7 +293,7 @@ export default function OnboardingPage() {
         )}
         <button
           type="submit"
-          disabled={loading || !sportCategory || (sportUsesStance(sportName) && !stance) || (sportUsesSnowStyle(sportName) && !snowStyle) || (sportUsesSkateStyle(sportName) && !skateStyle) || (sportUsesFootForward(sportName) && !footForward) || (sportUsesDiscipline(sportName) && !discipline)}
+          disabled={loading || !sportCategory || (sportUsesStance(sportName) && !stance) || (sportUsesSnowStyle(sportName) && snowStyles.length === 0) || (sportUsesSkateStyle(sportName) && skateStyles.length === 0) || (sportUsesFootForward(sportName) && !footForward) || (sportUsesDiscipline(sportName) && disciplines.length === 0)}
           className="w-full px-6 py-3 border-2 border-fta-black bg-fta-black text-fta-paper font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors disabled:opacity-50"
         >
           {loading ? "Saving…" : "Continue"}

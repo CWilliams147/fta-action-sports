@@ -25,6 +25,9 @@ export type DisciplineType = "freestyle" | "racing" | "enduro";
 /** Legacy motor/other style (kept for backward compat if needed) */
 export type StyleType = "park" | "street" | "dirt" | "flatland";
 
+/** Brand scouting status for Brand Hub */
+export type ScoutingStatusType = "actively_scouting" | "monitoring" | "roster_full";
+
 export interface Profile {
   id: string;
   account_type: AccountType;
@@ -38,12 +41,179 @@ export interface Profile {
   sport_category: SportCategory | null;
   sport_name: string | null;
   stance: StanceType | null;
-  snow_style: SnowStyleType | null;
-  skate_style: SkateStyleType | null;
+  snow_styles: SnowStyleType[] | null;
+  skate_styles: SkateStyleType[] | null;
   foot_forward: FootForwardType | null;
   style: StyleType | null;
-  discipline: DisciplineType | null;
+  disciplines: DisciplineType[] | null;
   verified: boolean;
+  /** Brand-only */
+  banner_url: string | null;
+  email_public: string | null;
+  twitter: string | null;
+  youtube: string | null;
+  scouting_status: ScoutingStatusType | null;
+}
+
+/** Clip Catalog: one clip per row, linked to profile */
+export interface Clip {
+  id: string;
+  profile_id: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  trick_name: string | null;
+  location: string | null;
+  spot_name: string | null;
+  created_at: string;
+}
+
+/** Daps: one row per user per clip (user can only dap a clip once) */
+export interface Dap {
+  id: string;
+  user_id: string;
+  clip_id: string;
+  created_at: string;
+}
+
+/** Profile Daps (Athlete Reputation): one row per voter per athlete (voter can only dap an athlete once) */
+export interface ProfileDap {
+  id: string;
+  voter_id: string;
+  athlete_id: string;
+  created_at: string;
+}
+
+/** Brand Watchlist: brand_id + athlete_id, unique per pair */
+export interface Watchlist {
+  id: string;
+  brand_id: string;
+  athlete_id: string;
+  created_at: string;
+}
+
+/** Scout feed: athlete card with total daps, latest clip, and watchlist status */
+export interface ScoutAthlete {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar_url: string | null;
+  sport_name: string | null;
+  home_town: string | null;
+  stance: StanceType | null;
+  foot_forward: FootForwardType | null;
+  athlete_daps_count: number;
+  latest_clip: { id: string; video_url: string; thumbnail_url: string | null } | null;
+  on_watchlist: boolean;
+}
+
+/** Trending: top athletes by clip daps in last 7 days */
+export interface TrendingAthlete {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  sport_name: string | null;
+  clip_daps_7d: number;
+}
+
+/** Discovery feed: clip with athlete display name and daps info */
+export interface DiscoveryClip {
+  id: string;
+  profile_id: string;
+  video_url: string;
+  thumbnail_url: string | null;
+  trick_name: string | null;
+  location: string | null;
+  spot_name: string | null;
+  created_at: string;
+  profiles: { display_name: string | null; username: string | null } | null;
+  daps_count: number;
+  user_has_dapped: boolean;
+}
+
+/** Spot Map: type is sport-specific riding style (stored as TEXT). */
+/** Spot: map location with name, sport, type (style), lat/lng, description */
+export interface Spot {
+  id: string;
+  name: string;
+  sport: string;
+  type: string;
+  lat: number;
+  lng: number;
+  description: string | null;
+  created_at: string;
+}
+
+/** Spot style options per sport (riding styles from profile logic). */
+export const SPOT_STYLE_OPTIONS_BY_SPORT: Record<string, { value: string; label: string }[]> = {
+  Skateboard: [
+    { value: "street", label: "Street" },
+    { value: "vert", label: "Vert" },
+    { value: "park", label: "Park" },
+    { value: "freestyle", label: "Freestyle" },
+    { value: "downhill", label: "Downhill" },
+  ],
+  Snowboard: [
+    { value: "park_pipe", label: "Park/Pipe" },
+    { value: "big_mountain", label: "Big Mountain" },
+    { value: "backcountry", label: "Backcountry" },
+  ],
+  Skiing: [
+    { value: "park_pipe", label: "Park/Pipe" },
+    { value: "big_mountain", label: "Big Mountain" },
+    { value: "backcountry", label: "Backcountry" },
+  ],
+  Surf: [
+    { value: "beach", label: "Beach" },
+    { value: "point", label: "Point" },
+    { value: "reef", label: "Reef" },
+    { value: "park", label: "Park" },
+    { value: "street", label: "Street" },
+  ],
+  BMX: [
+    { value: "park", label: "Park" },
+    { value: "street", label: "Street" },
+    { value: "dirt", label: "Dirt" },
+    { value: "flatland", label: "Flatland" },
+    { value: "diy", label: "DIY" },
+  ],
+  MTB: [
+    { value: "park", label: "Park" },
+    { value: "trail", label: "Trail" },
+    { value: "downhill", label: "Downhill" },
+    { value: "enduro", label: "Enduro" },
+    { value: "dirt", label: "Dirt" },
+  ],
+  Moto: [
+    { value: "freestyle", label: "Freestyle" },
+    { value: "racing", label: "Racing" },
+    { value: "enduro", label: "Enduro" },
+  ],
+};
+
+/** Resolve spot type value to display label for a given sport. */
+export function getSpotTypeLabel(sport: string, typeValue: string): string {
+  const options = SPOT_STYLE_OPTIONS_BY_SPORT[sport];
+  if (options) {
+    const found = options.find((o) => o.value === typeValue);
+    if (found) return found.label;
+  }
+  return typeValue.charAt(0).toUpperCase() + typeValue.slice(1).replace(/_/g, " ");
+}
+
+/** Check-in: user checked in at spot at created_at (filter for latest per user in app) */
+export interface CheckIn {
+  id: string;
+  user_id: string;
+  spot_id: string;
+  created_at: string;
+}
+
+/** Spot with computed analytics for Spot Card */
+export interface SpotWithStats extends Spot {
+  active_now: number;
+  weekly_avg: number;
+  heating_up: boolean;
+  recent_check_ins: { user_id: string; display_name: string | null; avatar_url: string | null }[];
 }
 
 /** Sport options: name + category. Stance = Skateboard, Surf, Snowboard. Snow style = Skiing, Snowboard. */
@@ -90,6 +260,19 @@ export const DISCIPLINE_OPTIONS: { value: DisciplineType; label: string }[] = [
   { value: "freestyle", label: "Freestyle" },
   { value: "racing", label: "Racing" },
   { value: "enduro", label: "Enduro" },
+];
+
+/** Brand scouting status: display label + Tailwind-style for Brand Hub */
+export const SCOUTING_STATUS_OPTIONS: {
+  value: ScoutingStatusType;
+  label: string;
+  displayLabel: string;
+  /** Brutalist: orange = actively, grey = monitoring, black = roster full */
+  buttonClass: string;
+}[] = [
+  { value: "actively_scouting", label: "Actively scouting", displayLabel: "ACTIVELY SCOUTING", buttonClass: "border-fta-orange bg-fta-orange text-fta-black" },
+  { value: "monitoring", label: "Monitoring", displayLabel: "MONITORING", buttonClass: "border-fta-black bg-[#9ca3af] text-fta-black" },
+  { value: "roster_full", label: "Roster full", displayLabel: "ROSTER FULL", buttonClass: "border-fta-black bg-fta-black text-fta-paper" },
 ];
 
 /** Whether this sport name uses Stance (Regular/Goofy) */

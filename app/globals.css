@@ -16,3 +16,14 @@ body {
 * {
   border-radius: 0;
 }
+
+/* Spot Map: grayscale tiles for brutalist look */
+.map-container .leaflet-tile-pane img {
+  filter: grayscale(100%) contrast(1.05);
+}
+.fta-marker,
+.fta-user-marker,
+.fta-search-marker {
+  background: transparent !important;
+  border: none !important;
+}

@@ -62,6 +62,12 @@
 
 The migration enforces this with a `profiles_athlete_sport_check` constraint. Brand profiles have no sport fields.
 
+## Clip Catalog
+
+- **clips** table: `profile_id`, `video_url`, `thumbnail_url`, `trick_name`, `location`, `spot_name`, `created_at`.
+- Run `supabase/migrations/20250130150000_clips_table.sql` in the SQL Editor (after other migrations). It creates the table, RLS, and a **clips** storage bucket with policies for authenticated upload (to own folder) and public read.
+- Athletes upload clips on **Edit profile** (Upload New Clip). Videos are stored in Supabase Storage. Public profile (`/profile/[username]`) shows a **Clip Catalog** grid; clicking a clip opens an HTML5 video modal.
+
 ## Design (from .cursorrules)
 
 - **Colors:** Black `#000000`, Paper `#F4F4F4`, Safety Orange `#FF5F1F`

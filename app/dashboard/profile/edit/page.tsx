@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { SportDropdown } from "@/components/SportDropdown";
+import { UploadClips } from "@/components/UploadClips";
+import { BrandEditForm } from "@/components/BrandEditForm";
 import {
   type StanceType,
+  type ScoutingStatusType,
   type FootForwardType,
   type SnowStyleType,
   type SkateStyleType,
@@ -31,10 +34,22 @@ export default function EditProfilePage() {
   const [username, setUsername] = useState("");
   const [sportName, setSportName] = useState("");
   const [stance, setStance] = useState<StanceType | "">("");
-  const [snowStyle, setSnowStyle] = useState<SnowStyleType | "">("");
-  const [skateStyle, setSkateStyle] = useState<SkateStyleType | "">("");
+  const [snowStyles, setSnowStyles] = useState<SnowStyleType[]>([]);
+  const [skateStyles, setSkateStyles] = useState<SkateStyleType[]>([]);
   const [footForward, setFootForward] = useState<FootForwardType | "">("");
-  const [discipline, setDiscipline] = useState<DisciplineType | "">("");
+  const [disciplines, setDisciplines] = useState<DisciplineType[]>([]);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [accountType, setAccountType] = useState<"athlete" | "brand" | null>(null);
+  const [brandInitial, setBrandInitial] = useState<{
+    display_name: string;
+    username: string;
+    bio: string;
+    banner_url: string | null;
+    email_public: string;
+    twitter: string;
+    youtube: string;
+    scouting_status: ScoutingStatusType | null;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
@@ -55,8 +70,19 @@ export default function EditProfilePage() {
           router.replace("/dashboard");
           return;
         }
-        if (profile.account_type !== "athlete") {
-          router.replace("/dashboard");
+        setProfileId(profile.id);
+        setAccountType(profile.account_type);
+        if (profile.account_type === "brand") {
+          setBrandInitial({
+            display_name: profile.display_name ?? "",
+            username: profile.username ?? "",
+            bio: profile.bio ?? "",
+            banner_url: profile.banner_url ?? null,
+            email_public: profile.email_public ?? "",
+            twitter: profile.twitter ?? "",
+            youtube: profile.youtube ?? "",
+            scouting_status: profile.scouting_status ?? null,
+          });
           return;
         }
         setDisplayName(profile.display_name ?? "");
@@ -65,10 +91,10 @@ export default function EditProfilePage() {
         setUsername(profile.username ?? "");
         setSportName(profile.sport_name ?? "");
         setStance((profile.stance as StanceType) ?? "");
-        setSnowStyle((profile.snow_style as SnowStyleType) ?? "");
-        setSkateStyle((profile.skate_style as SkateStyleType) ?? "");
+        setSnowStyles(Array.isArray(profile.snow_styles) ? profile.snow_styles : []);
+        setSkateStyles(Array.isArray(profile.skate_styles) ? profile.skate_styles : []);
         setFootForward((profile.foot_forward as FootForwardType) ?? "");
-        setDiscipline((profile.discipline as DisciplineType) ?? "");
+        setDisciplines(Array.isArray(profile.disciplines) ? profile.disciplines : []);
       });
     });
   }, [supabase, router]);
@@ -83,20 +109,20 @@ export default function EditProfilePage() {
       setMessage("Pick your stance.");
       return;
     }
-    if (sportUsesSnowStyle(sportName) && !snowStyle) {
-      setMessage("Pick your snow style.");
+    if (sportUsesSnowStyle(sportName) && snowStyles.length === 0) {
+      setMessage("Pick at least one snow style.");
       return;
     }
-    if (sportUsesSkateStyle(sportName) && !skateStyle) {
-      setMessage("Pick your style.");
+    if (sportUsesSkateStyle(sportName) && skateStyles.length === 0) {
+      setMessage("Pick at least one style.");
       return;
     }
     if (sportUsesFootForward(sportName) && !footForward) {
       setMessage("Pick your foot forward.");
       return;
     }
-    if (sportUsesDiscipline(sportName) && !discipline) {
-      setMessage("Pick your discipline.");
+    if (sportUsesDiscipline(sportName) && disciplines.length === 0) {
+      setMessage("Pick at least one discipline.");
       return;
     }
     setLoading(true);
@@ -117,17 +143,17 @@ export default function EditProfilePage() {
       sport_category: selectedSport.category,
       sport_name: sportName,
       stance: null,
-      snow_style: null,
-      skate_style: null,
+      snow_styles: [],
+      skate_styles: [],
       foot_forward: null,
-      discipline: null,
+      disciplines: [],
       updated_at: new Date().toISOString(),
     };
     if (sportUsesStance(sportName)) payload.stance = stance;
-    if (sportUsesSnowStyle(sportName)) payload.snow_style = snowStyle;
-    if (sportUsesSkateStyle(sportName)) payload.skate_style = skateStyle;
+    if (sportUsesSnowStyle(sportName)) payload.snow_styles = snowStyles;
+    if (sportUsesSkateStyle(sportName)) payload.skate_styles = skateStyles;
     if (sportUsesFootForward(sportName)) payload.foot_forward = footForward;
-    if (sportUsesDiscipline(sportName)) payload.discipline = discipline;
+    if (sportUsesDiscipline(sportName)) payload.disciplines = disciplines;
     const { error } = await supabase.from("profiles").upsert(payload, { onConflict: "id" });
     setLoading(false);
     if (error) {
@@ -146,6 +172,40 @@ export default function EditProfilePage() {
     );
   }
 
+  if (accountType === "brand" && brandInitial && profileId) {
+    return (
+      <main className="min-h-screen p-8 border-2 border-fta-black">
+        <header className="border-b-2 border-fta-black pb-4 mb-8">
+          <h1 className="text-3xl font-bold tracking-tight border-b-2 border-fta-orange pb-2 inline-block">
+            Edit Brand Hub
+          </h1>
+          <p className="text-fta-black/80 mt-2">Banner, scouting status, and contact links.</p>
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link
+              href="/dashboard"
+              className="text-sm font-bold text-fta-orange hover:underline"
+            >
+              ← Dashboard
+            </Link>
+            {brandInitial.username && (
+              <Link
+                href={`/profile/${brandInitial.username}`}
+                className="text-sm font-bold text-fta-orange hover:underline"
+              >
+                View Brand Hub
+              </Link>
+            )}
+          </div>
+        </header>
+        <BrandEditForm
+          profileId={profileId}
+          initial={brandInitial}
+          onSaved={() => router.refresh()}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen p-8 border-2 border-fta-black">
       <header className="border-b-2 border-fta-black pb-4 mb-8">
@@ -153,12 +213,20 @@ export default function EditProfilePage() {
           Edit profile
         </h1>
         <p className="text-fta-black/80 mt-2">Update your athlete profile.</p>
-        <Link
-          href="/dashboard"
-          className="inline-block mt-4 text-sm font-bold text-fta-orange hover:underline"
-        >
-          ← Dashboard
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-4">
+          <Link
+            href="/dashboard"
+            className="text-sm font-bold text-fta-orange hover:underline"
+          >
+            ← Dashboard
+          </Link>
+          <Link
+            href="/discovery"
+            className="text-sm font-bold text-fta-orange hover:underline"
+          >
+            Discovery
+          </Link>
+        </div>
       </header>
       <form onSubmit={handleSubmit} className="max-w-md space-y-6">
         <div>
@@ -220,10 +288,10 @@ export default function EditProfilePage() {
             onChange={(name) => {
               setSportName(name);
               setStance("");
-              setSnowStyle("");
-              setSkateStyle("");
+              setSnowStyles([]);
+              setSkateStyles([]);
               setFootForward("");
-              setDiscipline("");
+              setDisciplines([]);
             }}
             labelId="sport-label"
           />
@@ -252,16 +320,16 @@ export default function EditProfilePage() {
 
         {sportUsesSkateStyle(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Style</label>
+            <label className="block text-sm font-bold mb-2">Styles (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {SKATE_STYLE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="skate_style"
+                    type="checkbox"
+                    name="skate_styles"
                     value={opt.value}
-                    checked={skateStyle === opt.value}
-                    onChange={() => setSkateStyle(opt.value)}
+                    checked={skateStyles.includes(opt.value)}
+                    onChange={() => setSkateStyles((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -273,16 +341,16 @@ export default function EditProfilePage() {
 
         {sportUsesSnowStyle(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Snow style</label>
+            <label className="block text-sm font-bold mb-2">Snow styles (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {SNOW_STYLE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="snow_style"
+                    type="checkbox"
+                    name="snow_styles"
                     value={opt.value}
-                    checked={snowStyle === opt.value}
-                    onChange={() => setSnowStyle(opt.value)}
+                    checked={snowStyles.includes(opt.value)}
+                    onChange={() => setSnowStyles((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -315,16 +383,16 @@ export default function EditProfilePage() {
 
         {sportUsesDiscipline(sportName) && (
           <div>
-            <label className="block text-sm font-bold mb-2">Discipline</label>
+            <label className="block text-sm font-bold mb-2">Disciplines (pick all that apply)</label>
             <div className="flex flex-wrap gap-2">
               {DISCIPLINE_OPTIONS.map((opt) => (
                 <label key={opt.value} className="flex items-center gap-2 border-2 border-fta-black px-4 py-2 has-[:checked]:bg-fta-orange has-[:checked]:border-fta-orange rounded-none">
                   <input
-                    type="radio"
-                    name="discipline"
+                    type="checkbox"
+                    name="disciplines"
                     value={opt.value}
-                    checked={discipline === opt.value}
-                    onChange={() => setDiscipline(opt.value)}
+                    checked={disciplines.includes(opt.value)}
+                    onChange={() => setDisciplines((prev) => prev.includes(opt.value) ? prev.filter((v) => v !== opt.value) : [...prev, opt.value])}
                     className="sr-only"
                   />
                   <span className="font-bold">{opt.label}</span>
@@ -337,12 +405,16 @@ export default function EditProfilePage() {
         {message && <p className="text-sm font-medium text-red-600">{message}</p>}
         <button
           type="submit"
-          disabled={loading || !selectedSport || (sportUsesStance(sportName) && !stance) || (sportUsesSnowStyle(sportName) && !snowStyle) || (sportUsesSkateStyle(sportName) && !skateStyle) || (sportUsesFootForward(sportName) && !footForward) || (sportUsesDiscipline(sportName) && !discipline)}
+          disabled={loading || !selectedSport || (sportUsesStance(sportName) && !stance) || (sportUsesSnowStyle(sportName) && snowStyles.length === 0) || (sportUsesSkateStyle(sportName) && skateStyles.length === 0) || (sportUsesFootForward(sportName) && !footForward) || (sportUsesDiscipline(sportName) && disciplines.length === 0)}
           className="px-6 py-3 border-2 border-fta-black bg-fta-black text-fta-paper font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors disabled:opacity-50 rounded-none"
         >
           {loading ? "Saving…" : "Save profile"}
         </button>
       </form>
+
+      {profileId && (
+        <UploadClips profileId={profileId} />
+      )}
     </main>
   );
 }

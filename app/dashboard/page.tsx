@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { SNOW_STYLE_OPTIONS, SKATE_STYLE_OPTIONS, DISCIPLINE_OPTIONS } from "@/lib/types/database";
+
+function formatLabels(vals: string[] | null | undefined, opts: { value: string; label: string }[]): string {
+  if (!vals?.length) return "";
+  return vals.map((v) => opts.find((o) => o.value === v)?.label ?? v).join(", ");
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -30,28 +36,58 @@ export default async function DashboardPage() {
           {profile.account_type === "athlete" && profile.stance && (
             <> · Stance: {profile.stance}</>
           )}
-          {profile.account_type === "athlete" && profile.snow_style && (
-            <> · Snow style: {profile.snow_style}</>
-          )}
-          {profile.account_type === "athlete" && profile.skate_style && (
-            <> · Style: {profile.skate_style}</>
-          )}
+          {profile.account_type === "athlete" && profile.snow_styles?.length ? (
+            <> · Snow styles: {formatLabels(profile.snow_styles as string[], SNOW_STYLE_OPTIONS)}</>
+          ) : null}
+          {profile.account_type === "athlete" && profile.skate_styles?.length ? (
+            <> · Styles: {formatLabels(profile.skate_styles as string[], SKATE_STYLE_OPTIONS)}</>
+          ) : null}
           {profile.account_type === "athlete" && profile.foot_forward && (
             <> · Foot forward: {profile.foot_forward}</>
           )}
-          {profile.account_type === "athlete" && profile.discipline && (
-            <> · Discipline: {profile.discipline}</>
-          )}
+          {profile.account_type === "athlete" && profile.disciplines?.length ? (
+            <> · Disciplines: {formatLabels(profile.disciplines as string[], DISCIPLINE_OPTIONS)}</>
+          ) : null}
         </p>
       </header>
       <p className="text-fta-black/80 mb-6">
         Signed in as {user.email}. Clip catalogs and The Vouch coming next.
       </p>
+      {profile.account_type === "brand" && (
+        <div className="flex flex-wrap gap-2 mb-6">
+          <Link
+            href="/scout"
+            className="px-6 py-3 border-2 border-fta-black bg-fta-orange text-fta-black font-bold hover:bg-fta-paper hover:border-fta-orange transition-colors rounded-none"
+          >
+            Scout
+          </Link>
+          {profile.username ? (
+            <Link
+              href={`/profile/${profile.username}`}
+              className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
+            >
+              My Profile
+            </Link>
+          ) : null}
+          <Link
+            href="/dashboard/profile/edit"
+            className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
+          >
+            {profile.username ? "Edit Brand Hub" : "Set up Brand Hub"}
+          </Link>
+        </div>
+      )}
       {profile.account_type === "athlete" && (
         <div className="flex flex-wrap gap-2 mb-6">
           <Link
-            href="/dashboard/profile/edit"
+            href="/discovery"
             className="px-6 py-3 border-2 border-fta-black bg-fta-orange text-fta-black font-bold hover:bg-fta-paper hover:border-fta-orange transition-colors rounded-none"
+          >
+            Discovery
+          </Link>
+          <Link
+            href="/dashboard/profile/edit"
+            className="px-6 py-3 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
           >
             Edit profile
           </Link>

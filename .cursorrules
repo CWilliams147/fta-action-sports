@@ -27,4 +27,5 @@ When building profile forms or database schemas, the technical spec field must a
 
 - Prioritize "Clip Catalogs" over "Feeds."
 - All data should be searchable and filterable for "Brand" accounts.
-- Design for "The Vouch" system instead of a traditional "Like" system.
+- Design for "The Daps" system instead of a traditional "Like" or "Vouch" system.
+- UI should use the phrase "Give Daps" or "Dapped Up."
