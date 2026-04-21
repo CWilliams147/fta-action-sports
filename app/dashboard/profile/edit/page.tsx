@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { SportDropdown } from "@/components/SportDropdown";
-import { UploadClips } from "@/components/UploadClips";
 import { BrandEditForm } from "@/components/BrandEditForm";
 import { CreativeEditForm } from "@/components/CreativeEditForm";
 import {
+  type AccountType,
   type StanceType,
   type ScoutingStatusType,
   type FootForwardType,
@@ -40,7 +40,7 @@ export default function EditProfilePage() {
   const [footForward, setFootForward] = useState<FootForwardType | "">("");
   const [disciplines, setDisciplines] = useState<DisciplineType[]>([]);
   const [profileId, setProfileId] = useState<string | null>(null);
-  const [accountType, setAccountType] = useState<"athlete" | "brand" | null>(null);
+  const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [brandInitial, setBrandInitial] = useState<{
     display_name: string;
     username: string;
@@ -80,7 +80,7 @@ export default function EditProfilePage() {
       supabase.from("profiles").select("*").eq("id", user.id).single().then(({ data: profile, error }) => {
         setFetching(false);
         if (error || !profile) {
-          router.replace("/dashboard");
+          router.replace("/auth/sign-in");
           return;
         }
         setProfileId(profile.id);
@@ -188,7 +188,7 @@ export default function EditProfilePage() {
       setMessage(error.message);
       return;
     }
-    router.push("/dashboard");
+    router.push(username.trim() ? `/profile/${username.trim()}` : "/map");
     router.refresh();
   }
 
@@ -209,17 +209,17 @@ export default function EditProfilePage() {
           </h1>
           <p className="text-fta-black/80 mt-2">Equipment, specialties, portfolio, day rate.</p>
           <div className="mt-4 flex flex-wrap gap-4">
-            <Link href="/dashboard" className="text-sm font-bold text-fta-orange hover:underline">
-              ← Dashboard
-            </Link>
             {creativeInitial.username && (
               <Link
                 href={`/profile/${creativeInitial.username}`}
                 className="text-sm font-bold text-fta-orange hover:underline"
               >
-                View profile
+                ← Profile
               </Link>
             )}
+            <Link href="/creatives" className="text-sm font-bold text-fta-orange hover:underline">
+              Filmer Directory
+            </Link>
           </div>
         </header>
         <CreativeEditForm
@@ -240,20 +240,17 @@ export default function EditProfilePage() {
           </h1>
           <p className="text-fta-black/80 mt-2">Banner, scouting status, and contact links.</p>
           <div className="mt-4 flex flex-wrap gap-4">
-            <Link
-              href="/dashboard"
-              className="text-sm font-bold text-fta-orange hover:underline"
-            >
-              ← Dashboard
-            </Link>
             {brandInitial.username && (
               <Link
                 href={`/profile/${brandInitial.username}`}
                 className="text-sm font-bold text-fta-orange hover:underline"
               >
-                View Brand Hub
+                ← Profile
               </Link>
             )}
+            <Link href="/scout" className="text-sm font-bold text-fta-orange hover:underline">
+              Scout
+            </Link>
           </div>
         </header>
         <BrandEditForm
@@ -273,12 +270,14 @@ export default function EditProfilePage() {
         </h1>
         <p className="text-fta-black/80 mt-2">Update your athlete profile.</p>
         <div className="mt-4 flex flex-wrap gap-4">
-          <Link
-            href="/dashboard"
-            className="text-sm font-bold text-fta-orange hover:underline"
-          >
-            ← Dashboard
-          </Link>
+          {username && (
+            <Link
+              href={`/profile/${username}`}
+              className="text-sm font-bold text-fta-orange hover:underline"
+            >
+              ← Profile
+            </Link>
+          )}
           <Link
             href="/discovery"
             className="text-sm font-bold text-fta-orange hover:underline"
@@ -470,10 +469,6 @@ export default function EditProfilePage() {
           {loading ? "Saving…" : "Save profile"}
         </button>
       </form>
-
-      {profileId && (
-        <UploadClips profileId={profileId} />
-      )}
     </main>
   );
 }

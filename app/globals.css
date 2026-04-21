@@ -6,6 +6,7 @@
   --fta-black: #000000;
   --fta-paper: #F4F4F4;
   --fta-orange: #FF5F1F;
+  --fta-cream: #FBF8F2;
 }
 
 body {
@@ -26,4 +27,16 @@ body {
 .fta-search-marker {
   background: transparent !important;
   border: none !important;
+}
+
+/* Spot hover tooltip: brutalist styling (override Leaflet inline styles) */
+.map-container .leaflet-tooltip.fta-spot-tooltip {
+  background: var(--fta-paper) !important;
+  border: 3px solid var(--fta-black) !important;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  max-width: none;
 }

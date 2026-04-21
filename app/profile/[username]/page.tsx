@@ -14,15 +14,23 @@ import {
   sportUsesFootForward,
   sportUsesDiscipline,
 } from "@/lib/types/database";
+import { BrandLogoFull, BrandLogoFullLink } from "@/components/BrandLogo";
 import { ClipCatalog } from "@/components/ClipCatalog";
 import { AthleteDaps } from "@/components/AthleteDaps";
 import type { Clip } from "@/lib/types/database";
 
-function formatSpecLabel(value: string, options: { value: string; label: string }[]): string {
+function formatSpecLabel(
+  value: string,
+  options: { value: string; label: string }[],
+): string {
   return options.find((o) => o.value === value)?.label ?? value;
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ username: string }> }): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
   const { username } = await params;
   const supabase = await createClient();
   const { data: profile } = await supabase
@@ -31,15 +39,34 @@ export async function generateMetadata({ params }: { params: Promise<{ username:
     .eq("username", username)
     .single();
   if (!profile) return { title: "Profile | FTA Action Sports" };
-  const name = profile.display_name || (profile.account_type === "brand" ? "Brand" : profile.account_type === "creative" ? "Creative" : "Athlete");
-  const suffix = profile.account_type === "brand" ? " · Brand" : profile.account_type === "creative" ? " · Creative" : profile.sport_name ? ` · ${profile.sport_name}` : "";
+  const name =
+    profile.display_name ||
+    (profile.account_type === "brand"
+      ? "Brand"
+      : profile.account_type === "creative"
+        ? "Creative"
+        : "Athlete");
+  const suffix =
+    profile.account_type === "brand"
+      ? " · Brand"
+      : profile.account_type === "creative"
+        ? " · Creative"
+        : profile.sport_name
+          ? ` · ${profile.sport_name}`
+          : "";
   return { title: `${name}${suffix} | FTA Action Sports` };
 }
 
-export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
+export default async function ProfilePage({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
   const { username } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
@@ -72,8 +99,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       .select("voter_id")
       .eq("creative_id", profile.id);
     const vouchesCount = vouchRows?.length ?? 0;
-    const userHasVouched = !!user?.id && (vouchRows ?? []).some((r: { voter_id: string }) => r.voter_id === user.id);
-    const { CreativeHub: CreativeHubView } = await import("@/components/CreativeHub");
+    const userHasVouched =
+      !!user?.id &&
+      (vouchRows ?? []).some(
+        (r: { voter_id: string }) => r.voter_id === user.id,
+      );
+    const { CreativeHub: CreativeHubView } =
+      await import("@/components/CreativeHub");
     return (
       <CreativeHubView
         display_name={profile.display_name}
@@ -108,15 +140,33 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
   const profileDapsList = profileDapsRows ?? [];
   const athleteDapsCount = profileDapsList.length;
   const userHasDappedAthlete =
-    !!user?.id && profileDapsList.some((r: { voter_id: string }) => r.voter_id === user.id);
+    !!user?.id &&
+    profileDapsList.some((r: { voter_id: string }) => r.voter_id === user.id);
 
   const sportName = profile.sport_name ?? "";
   const specParts: string[] = [];
-  if (sportUsesStance(sportName) && profile.stance) specParts.push(formatSpecLabel(profile.stance, STANCE_OPTIONS));
-  if (sportUsesSnowStyle(sportName) && profile.snow_styles?.length) specParts.push((profile.snow_styles as string[]).map((v) => formatSpecLabel(v, SNOW_STYLE_OPTIONS)).join(", "));
-  if (sportUsesSkateStyle(sportName) && profile.skate_styles?.length) specParts.push((profile.skate_styles as string[]).map((v) => formatSpecLabel(v, SKATE_STYLE_OPTIONS)).join(", "));
-  if (sportUsesFootForward(sportName) && profile.foot_forward) specParts.push(formatSpecLabel(profile.foot_forward, FOOT_FORWARD_OPTIONS));
-  if (sportUsesDiscipline(sportName) && profile.disciplines?.length) specParts.push((profile.disciplines as string[]).map((v) => formatSpecLabel(v, DISCIPLINE_OPTIONS)).join(", "));
+  if (sportUsesStance(sportName) && profile.stance)
+    specParts.push(formatSpecLabel(profile.stance, STANCE_OPTIONS));
+  if (sportUsesSnowStyle(sportName) && profile.snow_styles?.length)
+    specParts.push(
+      (profile.snow_styles as string[])
+        .map((v) => formatSpecLabel(v, SNOW_STYLE_OPTIONS))
+        .join(", "),
+    );
+  if (sportUsesSkateStyle(sportName) && profile.skate_styles?.length)
+    specParts.push(
+      (profile.skate_styles as string[])
+        .map((v) => formatSpecLabel(v, SKATE_STYLE_OPTIONS))
+        .join(", "),
+    );
+  if (sportUsesFootForward(sportName) && profile.foot_forward)
+    specParts.push(formatSpecLabel(profile.foot_forward, FOOT_FORWARD_OPTIONS));
+  if (sportUsesDiscipline(sportName) && profile.disciplines?.length)
+    specParts.push(
+      (profile.disciplines as string[])
+        .map((v) => formatSpecLabel(v, DISCIPLINE_OPTIONS))
+        .join(", "),
+    );
   const specLabel = specParts.length ? specParts.join(" · ") : null;
 
   return (
@@ -130,10 +180,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                 {profile.display_name || "Athlete"}
               </h1>
               {profile.sport_name && (
-                <p className="text-lg font-bold text-fta-black/80 mt-2">{profile.sport_name}</p>
+                <p className="text-lg font-bold text-fta-black/80 mt-2">
+                  {profile.sport_name}
+                </p>
               )}
               {specLabel && (
-                <p className="text-sm font-bold text-fta-black/70 mt-0.5">{specLabel}</p>
+                <p className="text-sm font-bold text-fta-black/70 mt-0.5">
+                  {specLabel}
+                </p>
               )}
             </div>
             {profile.verified && (
@@ -158,11 +212,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
         <div className="p-6 space-y-4 border-b-2 border-fta-black">
           {profile.home_town && (
             <p className="text-sm font-bold text-fta-black/80">
-              <span className="text-fta-black/60">Home</span> {profile.home_town}
+              <span className="text-fta-black/60">Home</span>{" "}
+              {profile.home_town}
             </p>
           )}
           {profile.bio && (
-            <p className="text-sm text-fta-black/90 leading-relaxed">{profile.bio}</p>
+            <p className="text-sm text-fta-black/90 leading-relaxed">
+              {profile.bio}
+            </p>
           )}
         </div>
 
@@ -184,10 +241,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
           </Link>
           {user ? (
             <Link
-              href="/dashboard"
+              href="/dashboard/profile/edit"
               className="px-4 py-2 border-2 border-fta-black bg-fta-black text-fta-paper font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none text-sm"
             >
-              Back to Dashboard
+              Edit profile
             </Link>
           ) : (
             <Link
@@ -202,7 +259,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
 
       <ClipCatalog clips={(clips ?? []) as Clip[]} />
 
-      <p className="mt-6 text-sm text-fta-black/60">FTA Action Sports · Forget the Algorithm</p>
+      <div className="mt-10 flex flex-col items-center gap-3 w-full max-w-md px-4">
+        <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
+        <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
+          FTA Action Sports
+        </p>
+      </div>
     </main>
   );
 }

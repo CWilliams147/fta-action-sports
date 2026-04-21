@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogoFull, BrandLogoFullLink } from "@/components/BrandLogo";
 import { CreativeVouch } from "@/components/CreativeVouch";
 
 interface CreativeHubProps {
@@ -77,7 +78,9 @@ export function CreativeHub({
             <p className="text-xs font-bold text-fta-black/70 uppercase tracking-wide mb-2">
               Equipment
             </p>
-            <p className="text-sm font-bold text-fta-black">{equipment.join(", ")}</p>
+            <p className="text-sm font-bold text-fta-black">
+              {equipment.join(", ")}
+            </p>
           </div>
         )}
 
@@ -92,7 +95,9 @@ export function CreativeHub({
             <p className="text-xs font-bold text-fta-black/70 uppercase tracking-wide mb-1">
               Day rate
             </p>
-            <p className="text-lg font-bold text-fta-orange">${Number(day_rate).toLocaleString()}</p>
+            <p className="text-lg font-bold text-fta-orange">
+              ${Number(day_rate).toLocaleString()}
+            </p>
           </div>
         )}
 
@@ -141,7 +146,9 @@ export function CreativeHub({
               </a>
             )}
             {!yt && !vimeo && !behance && (
-              <p className="text-sm text-fta-black/60">No portfolio links yet.</p>
+              <p className="text-sm text-fta-black/60">
+                No portfolio links yet.
+              </p>
             )}
           </div>
         </div>
@@ -178,9 +185,12 @@ export function CreativeHub({
           )}
         </div>
       </div>
-      <p className="max-w-3xl mx-auto px-6 pb-10 text-sm text-fta-black/60">
-        FTA Action Sports · Forget the Algorithm
-      </p>
+      <div className="max-w-3xl mx-auto px-6 pb-10 flex flex-col items-center gap-3">
+        <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
+        <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
+          FTA Action Sports
+        </p>
+      </div>
     </main>
   );
 }

@@ -1,31 +1,34 @@
 # FTA Action Sports - Global Project Rules
 
-## 1. BRAND IDENTITY & AESTHETIC
+## 1. BRAND IDENTITY & AESTHETIC (Mobile-First)
 
-- **Name:** FTA Action Sports (Forget the Algorithm).
-- **Vibe:** Raw, authentic, high-contrast, "Brutalist" design.
-- **Visuals:** Use Tailwind CSS. Stick to Black (#000000), "Paper" White (#F4F4F4), and "Safety Orange" (#FF5F1F) for accents.
-- **UI:** Sharp edges (no rounded corners), bold borders (2px+), and large, heavy sans-serif typography. Avoid soft shadows or "corporate" gradients.
+- **Vibe:** Raw, "Brutalist" design. Black (#000000), "Paper" White (#F4F4F4), "Safety Orange" (#FF5F1F).
+- **UI:** Sharp edges (no rounded corners).
+- **Borders:** 3px on desktop (`lg:`), scale to 2px on mobile (`sm:`) to prevent visual crowding.
+- **Typography:** Bold, heavy sans-serif. Use `text-balance` for mobile headlines.
+- **Touch Targets:** All clickable elements must be min 44x44px.
 
-## 2. DYNAMIC SPORT LOGIC (Updated)
+## 2. MOBILE ARCHITECTURE
 
-When building profile forms or database schemas, the technical spec field must adapt:
+- **Navigation:** Use a Bottom Tab Bar for screens < 768px (`md`). SiteNav is for desktop only.
+- **Map Behavior:** - Mobile = 2-finger pan (use `leaflet-gesture-handling`).
+  - No hover tooltips; use a slide-up Bottom Sheet (Vaul) for Spot Hub details.
+  - No right-click; use a 'Long Press' or FAB (Floating Action Button) to "Add Spot."
+- **Layout:** Default to 1 column. Use `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`.
 
-- **Board Sports (Skateboard, Surf, Snowboard):** Field = "Stance" (Options: Regular, Goofy).
-- **Bike Sports (BMX, MTB):** Field = "Foot Forward" (Options: Left, Right).
-- **Skiing:** Hide stance field. Replace with "Primary Style" (Options: Park/Pipe, Big Mountain, Backcountry).
-- **Moto:** Field = "Discipline" (Options: Freestyle, Racing, Enduro).
+## 3. DYNAMIC SPORT LOGIC
 
-## 3. TECH STACK PREFERENCES
+- **Board Sports:** Field = "Stance" (Regular/Goofy).
+- **Bike Sports:** Field = "Foot Forward" (Left/Right).
+- **Skiing:** Hide stance; Field = "Primary Style" (Park/Pipe, Big Mountain, Backcountry).
+- **Moto:** Field = "Discipline" (Freestyle, Racing, Enduro).
 
-- **Framework:** Next.js (App Router).
-- **Styling:** Tailwind CSS.
-- **Backend/Database:** Supabase (PostgreSQL).
-- **Components:** Clean, functional, server-side where possible.
+## 4. TECH STACK
 
-## 4. THE "FTA" PHILOSOPHY
+- **Framework:** Next.js (App Router), Tailwind CSS, Supabase.
+- **PWA:** Maintain a `manifest.ts` and service worker for "Add to Home Screen" support.
 
-- Prioritize "Clip Catalogs" over "Feeds."
-- All data should be searchable and filterable for "Brand" accounts.
-- Design for "The Daps" system instead of a traditional "Like" or "Vouch" system.
-- UI should use the phrase "Give Daps" or "Dapped Up."
+## 5. THE "FTA" PHILOSOPHY
+
+- Use "Give Daps" or "Dapped Up" for all social validation.
+- Focus on Clip Catalogs and filterable data for Brand accounts.

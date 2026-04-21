@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogoFull, BrandLogoFullLink } from "@/components/BrandLogo";
 import { SCOUTING_STATUS_OPTIONS } from "@/lib/types/database";
 import type { ScoutingStatusType } from "@/lib/types/database";
 
@@ -58,6 +59,13 @@ export function BrandHub({
       )}
 
       <div className="max-w-3xl mx-auto p-6 md:p-10">
+        <div className="flex justify-center mb-8">
+          <BrandLogoFullLink
+            href="/"
+            className="border-b-[3px] border-fta-orange pb-2"
+            logoClassName="h-12 sm:h-14 w-auto max-w-[min(100%,340px)] object-contain object-center"
+          />
+        </div>
         {/* Scouting status at top – prominent for athletes */}
         {scoutingOption && (
           <div className="mb-6">
@@ -108,7 +116,11 @@ export function BrandHub({
           )}
           {twitter && (
             <a
-              href={twitter.startsWith("http") ? twitter : `https://twitter.com/${twitter.replace(/^@/, "")}`}
+              href={
+                twitter.startsWith("http")
+                  ? twitter
+                  : `https://twitter.com/${twitter.replace(/^@/, "")}`
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors"
@@ -118,7 +130,11 @@ export function BrandHub({
           )}
           {youtube && (
             <a
-              href={youtube.startsWith("http") ? youtube : `https://youtube.com/${youtube}`}
+              href={
+                youtube.startsWith("http")
+                  ? youtube
+                  : `https://youtube.com/${youtube}`
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 border-2 border-fta-black bg-fta-paper text-fta-black font-bold hover:bg-fta-orange hover:border-fta-orange transition-colors"
@@ -127,7 +143,9 @@ export function BrandHub({
             </a>
           )}
           {!email_public && !twitter && !youtube && (
-            <p className="text-sm text-fta-black/60">No contact links added yet.</p>
+            <p className="text-sm text-fta-black/60">
+              No contact links added yet.
+            </p>
           )}
         </div>
 
@@ -165,9 +183,12 @@ export function BrandHub({
         </div>
       </div>
 
-      <p className="max-w-3xl mx-auto px-6 pb-10 text-sm text-fta-black/60">
-        FTA Action Sports · Forget the Algorithm
-      </p>
-    </main>
+      <div className="max-w-3xl mx-auto px-6 pb-10 flex flex-col items-center gap-3">
+        <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
+        <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
+          FTA Action Sports
+        </p>
+      </div>
+   </main>
   );
 }

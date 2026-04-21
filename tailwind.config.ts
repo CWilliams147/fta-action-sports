@@ -12,10 +12,11 @@ export default {
           black: "#000000",
           paper: "#F4F4F4",
           orange: "#FF5F1F",
+          cream: "#FBF8F2",
         },
       },
 fontFamily: {
-      sans: ["system-ui", "ui-sans-serif", "sans-serif"],
+      sans: ["var(--font-inter)", "Inter", "system-ui", "ui-sans-serif", "sans-serif"],
     },
       borderRadius: {
         none: "0",

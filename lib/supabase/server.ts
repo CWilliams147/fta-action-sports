@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+/**
+ * Supabase client for Server Components, Server Actions, and Route Handlers.
+ * Uses next/headers cookies so auth state is available on the server.
+ * Cookie writes in setAll are no-ops when called from Server Components (read-only);
+ * the middleware refresh handles writing refreshed tokens.
+ */
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -18,7 +24,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Called from Server Component; ignore
+            // Called from a Server Component; cookies can only be set in Server Actions or Route Handlers.
           }
         },
       },

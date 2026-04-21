@@ -28,6 +28,9 @@ export type StyleType = "park" | "street" | "dirt" | "flatland";
 /** Brand scouting status for Brand Hub */
 export type ScoutingStatusType = "actively_scouting" | "monitoring" | "roster_full";
 
+/** Membership tier for map permissions */
+export type MembershipTier = "free" | "pro" | "brand";
+
 export interface Profile {
   id: string;
   account_type: AccountType;
@@ -60,6 +63,9 @@ export interface Profile {
   youtube_portfolio: string | null;
   vimeo_portfolio: string | null;
   behance_portfolio: string | null;
+  /** Map / permissions */
+  membership_tier: MembershipTier;
+  ghost_mode: boolean;
 }
 
 /** Clip Catalog: one clip per row, linked to profile */
@@ -154,6 +160,8 @@ export interface Spot {
   type: string;
   lat: number;
   lng: number;
+  /** Geofence radius for auto check-in / check-out (meters). Default 50 in DB. */
+  radius_meters: number;
   description: string | null;
   created_at: string;
 }
@@ -215,12 +223,22 @@ export function getSpotTypeLabel(sport: string, typeValue: string): string {
   return typeValue.charAt(0).toUpperCase() + typeValue.slice(1).replace(/_/g, " ");
 }
 
-/** Check-in: user checked in at spot at created_at (filter for latest per user in app) */
+/** Check-in session: active until expires_at or check-out */
 export interface CheckIn {
   id: string;
   user_id: string;
   spot_id: string;
+  status: "active" | "completed";
   created_at: string;
+  expires_at: string;
+}
+
+/** One checked-in user at a spot (display_name/avatar hidden if ghost_mode) */
+export interface SpotCheckInUser {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  ghost_mode: boolean;
 }
 
 /** Spot with computed analytics for Spot Card */
@@ -228,7 +246,29 @@ export interface SpotWithStats extends Spot {
   active_now: number;
   weekly_avg: number;
   heating_up: boolean;
-  recent_check_ins: { user_id: string; display_name: string | null; avatar_url: string | null }[];
+  recent_check_ins: SpotCheckInUser[];
+}
+
+/** Spot sponsor (brand linked to spot) */
+export interface SpotSponsor {
+  id: string;
+  spot_id: string;
+  brand_id: string;
+  created_at: string;
+}
+
+/** Spot detail: leaderboard (check-ins this month) + sponsors */
+export interface SpotLeaderboardEntry {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  ghost_mode: boolean;
+  check_ins_this_month: number;
+}
+
+export interface SpotDetail extends SpotWithStats {
+  leaderboard_this_month: SpotLeaderboardEntry[];
+  sponsors: { brand_id: string; display_name: string | null; avatar_url: string | null }[];
 }
 
 /** Sport options: name + category. Stance = Skateboard, Surf, Snowboard. Snow style = Skiing, Snowboard. */

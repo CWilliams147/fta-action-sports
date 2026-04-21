@@ -1,6 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+/**
+ * Refreshes the Supabase auth session and writes updated cookies to the response.
+ * Call this from root middleware so tokens stay fresh and protected routes can read the session.
+ */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({
     request,
@@ -23,7 +27,10 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // Refresh session if expired; refreshed tokens are written via setAll to response.cookies
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return response;
+  return { response, user };
 }

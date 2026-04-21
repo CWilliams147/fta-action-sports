@@ -1,80 +1,285 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import Link from "next/link";
 import L from "leaflet";
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
+import { GestureHandling } from "leaflet-gesture-handling";
+import "leaflet-gesture-handling/dist/leaflet-gesture-handling.css";
+import { MapContainer, TileLayer, Marker, CircleMarker, Tooltip, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { Drawer } from "vaul";
+import { BrandLogoFullLink, BRAND_LOGO_MAP_HEADER_CLASS } from "@/components/BrandLogo";
 import { createClient } from "@/lib/supabase/client";
-import type { SpotWithStats } from "@/lib/types/database";
+import type { SpotWithStats, SpotDetail } from "@/lib/types/database";
+import type { MembershipTier } from "@/lib/types/database";
 import { SPORT_OPTIONS, SPOT_STYLE_OPTIONS_BY_SPORT, getSpotTypeLabel } from "@/lib/types/database";
-import { getSpotsWithStats, createSpot, createCheckIn } from "./actions";
+import { useGeofence } from "@/hooks/useGeofence";
+import { haversineDistanceKm } from "@/lib/utils/geo";
+import {
+  getSpotsWithStats,
+  getSpotDetail,
+  getTrendHeatData,
+  getActiveRidersCountForSpot,
+  createSpot,
+  createCheckIn,
+  updateGhostMode,
+} from "./actions";
+
+L.Map.addInitHook("addHandler", "gestureHandling", GestureHandling);
 
 const SPOT_SPORTS = SPORT_OPTIONS.map((o) => o.name);
 
-function SpotCard({
-  spot,
+/** Combined snow/ski filter value (spots can be either sport) */
+const MAP_FILTER_SNOW_SKI = "Snowboard_Skiing";
+
+/** Sport filter options for map: All sports + each sport (Snowboard & Skiing combined as one option) */
+const MAP_SPORT_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "All sports" },
+  ...SPORT_OPTIONS.filter((o) => o.name !== "Skiing").map((o) =>
+    o.name === "Snowboard"
+      ? { value: MAP_FILTER_SNOW_SKI, label: "Snow" }
+      : { value: o.name, label: o.name }
+  ),
+];
+
+/** 10 miles in km for radius check (spot poaching prevention) */
+const RADIUS_KM = 10 * 1.60934;
+
+/**
+ * Optional override for local testing: ?mapGestures=desktop | touch | auto
+ * (persists in sessionStorage). Use when Chrome Device Mode spoofs mobile UA.
+ */
+function getMapGesturesOverride(): "desktop" | "touch" | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const q = new URLSearchParams(window.location.search).get("mapGestures");
+    if (q === "desktop" || q === "touch") {
+      sessionStorage.setItem("fta_mapGestures", q);
+      return q;
+    }
+    if (q === "auto") {
+      sessionStorage.removeItem("fta_mapGestures");
+      return null;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const s = sessionStorage.getItem("fta_mapGestures");
+    if (s === "desktop" || s === "touch") return s;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/**
+ * Split mobile UI from gesture policy:
+ * - mobileMapUx: layout (sheet, bottom nav) for narrow viewports or mobile UA.
+ * - cooperativeGestures: leaflet-gesture-handling (two-finger pan). Use (any-pointer: fine)
+ *   so a laptop mouse still counts while Chrome Device Mode spoofs coarse primary pointer.
+ *   Optional ?mapGestures= overrides remain for edge cases.
+ */
+function getMapInteractionProfile(): {
+  mobileMapUx: boolean;
+  cooperativeGestures: boolean;
+} {
+  if (typeof window === "undefined") {
+    return { mobileMapUx: false, cooperativeGestures: false };
+  }
+
+  const narrow = window.matchMedia("(max-width: 767px)").matches;
+  const ua = navigator.userAgent ?? "";
+  const mobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const touchCapable =
+    (navigator.maxTouchPoints ?? 0) > 0 ||
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(any-pointer: coarse)").matches;
+  const mobileDevice = mobileUa && touchCapable;
+
+  /** True if any input is a fine pointer (mouse/trackpad). Stays true in DevTools mobile emulation. */
+  const hasAnyFinePointer = window.matchMedia("(any-pointer: fine)").matches;
+
+  const override = getMapGesturesOverride();
+  let cooperativeGestures: boolean;
+  if (override === "desktop") cooperativeGestures = false;
+  else if (override === "touch") cooperativeGestures = true;
+  else cooperativeGestures = mobileDevice && !hasAnyFinePointer;
+
+  return {
+    mobileMapUx: narrow || mobileDevice,
+    cooperativeGestures,
+  };
+}
+
+/** Spot Hub: leaderboard this month, sponsors, who's here (permission + radius + ghost). No clips. */
+function SpotHub({
+  spotDetail,
+  currentUserId,
+  viewerTier,
+  userLocation,
   onCheckIn,
   onClose,
-  currentUserId,
-  isCheckedIn,
+  embedded,
 }: {
-  spot: SpotWithStats;
+  spotDetail: SpotDetail;
+  currentUserId: string | null;
+  viewerTier: MembershipTier;
+  userLocation: { lat: number; lng: number } | null;
   onCheckIn: () => void;
   onClose: () => void;
-  currentUserId: string | null;
-  isCheckedIn: boolean;
+  embedded?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
+  const [liveRidersCount, setLiveRidersCount] = useState(spotDetail.active_now);
+
+  useEffect(() => {
+    setLiveRidersCount(spotDetail.active_now);
+  }, [spotDetail.id, spotDetail.active_now]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const sid = spotDetail.id;
+    const refreshCount = () => {
+      getActiveRidersCountForSpot(sid).then(setLiveRidersCount);
+    };
+    refreshCount();
+    const channel = supabase
+      .channel(`check_ins_spot_${sid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "check_ins", filter: `spot_id=eq.${sid}` },
+        () => {
+          refreshCount();
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [spotDetail.id]);
+
+  const isCheckedIn = !!currentUserId && spotDetail.recent_check_ins.some((c) => c.user_id === currentUserId);
+  const within10Miles = userLocation
+    ? haversineDistanceKm(userLocation, { lat: spotDetail.lat, lng: spotDetail.lng }) <= RADIUS_KM
+    : false;
+  const canSeeNames =
+    (viewerTier === "free" && isCheckedIn) ||
+    (viewerTier === "pro" && within10Miles) ||
+    viewerTier === "brand";
+
+  const visibleCheckIns = useMemo(() => {
+    if (!canSeeNames) return [];
+    return spotDetail.recent_check_ins.filter((u) => !u.ghost_mode);
+  }, [canSeeNames, spotDetail.recent_check_ins]);
+
+  const visibleLeaderboard = useMemo(() => {
+    return spotDetail.leaderboard_this_month.filter((e) => !e.ghost_mode);
+  }, [spotDetail.leaderboard_this_month]);
 
   async function handleCheckIn() {
     if (!currentUserId || isCheckedIn) return;
     setLoading(true);
-    const result = await createCheckIn(spot.id);
+    const result = await createCheckIn(spotDetail.id);
     setLoading(false);
     if (!result.error) onCheckIn();
   }
 
   return (
-    <div className="absolute bottom-4 left-4 right-4 z-[1000] border-[3px] border-fta-black bg-fta-paper p-4 rounded-none">
+    <div
+      className={
+        embedded
+          ? "border-[3px] border-fta-black bg-fta-paper p-4 rounded-none max-h-[80vh] overflow-y-auto"
+          : "absolute bottom-4 left-4 right-4 z-[1000] border-[3px] border-fta-black bg-fta-paper p-4 rounded-none max-h-[80vh] overflow-y-auto"
+      }
+    >
       <div className="flex justify-between items-start gap-2 mb-3">
         <div>
-          <h2 className="text-lg font-bold uppercase tracking-tight text-fta-black">
-            {spot.name}
-          </h2>
+          <h2 className="text-lg font-bold uppercase tracking-tight text-fta-black">{spotDetail.name}</h2>
           <p className="text-sm font-bold uppercase text-fta-orange">
-            {spot.sport} · {getSpotTypeLabel(spot.sport, spot.type)}
+            {spotDetail.sport} · {getSpotTypeLabel(spotDetail.sport, spotDetail.type)}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-fta-black font-bold hover:text-fta-orange"
-          aria-label="Close"
-        >
+        <button type="button" onClick={onClose} className="text-fta-black font-bold hover:text-fta-orange" aria-label="Close">
           ×
         </button>
       </div>
+      <p className="text-sm font-bold uppercase tracking-wide text-fta-black mb-3" aria-live="polite">
+        <span className="text-fta-orange" aria-hidden>
+          ●
+        </span>{" "}
+        {liveRidersCount} RIDERS HERE
+      </p>
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="border-[3px] border-fta-black p-2">
           <p className="text-xs font-bold uppercase text-fta-black/70">Active now</p>
-          <p className="text-xl font-bold uppercase text-fta-black">{spot.active_now}</p>
+          <p className="text-xl font-bold uppercase text-fta-black">{liveRidersCount}</p>
         </div>
         <div className="border-[3px] border-fta-black p-2">
           <p className="text-xs font-bold uppercase text-fta-black/70">Weekly average</p>
-          <p className="text-xl font-bold uppercase text-fta-black">{spot.weekly_avg}</p>
+          <p className="text-xl font-bold uppercase text-fta-black">{spotDetail.weekly_avg}</p>
         </div>
       </div>
-      {spot.heating_up && (
+      {spotDetail.heating_up && (
         <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 border-[3px] border-fta-orange bg-fta-orange text-fta-black">
           <span className="inline-block w-2 h-2 bg-fta-black animate-pulse" aria-hidden />
           <span className="text-sm font-bold uppercase tracking-wide">HEATING UP</span>
         </div>
       )}
-      {spot.description && (
-        <p className="text-sm text-fta-black/80 mb-4">{spot.description}</p>
+      {spotDetail.description && <p className="text-sm text-fta-black/80 mb-4">{spotDetail.description}</p>}
+
+      {/* Live Leaderboard: this month */}
+      <div className="border-[3px] border-fta-black p-3 mb-4">
+        <p className="text-xs font-bold uppercase text-fta-black/70 mb-2">Leaderboard this month</p>
+        {visibleLeaderboard.length > 0 ? (
+          <ul className="list-none p-0 m-0 space-y-1">
+            {visibleLeaderboard.slice(0, 10).map((entry, i) => (
+              <li key={entry.user_id} className="flex items-center gap-2">
+                <span className="text-fta-orange font-bold w-5">{i + 1}.</span>
+                {entry.avatar_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={entry.avatar_url} alt="" className="w-6 h-6 border-2 border-fta-black object-cover" />
+                ) : (
+                  <span className="w-6 h-6 border-2 border-fta-black bg-fta-paper flex items-center justify-center text-[10px] font-bold">
+                    {(entry.display_name ?? "?")[0]}
+                  </span>
+                )}
+                <span className="font-medium text-fta-black truncate">{entry.display_name ?? "Athlete"}</span>
+                <span className="text-xs text-fta-black/70 ml-auto">{entry.check_ins_this_month} check-ins</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-fta-black/60">No check-ins this month yet.</p>
+        )}
+      </div>
+
+      {/* Sponsor presence */}
+      {spotDetail.sponsors.length > 0 && (
+        <div className="border-[3px] border-fta-black p-3 mb-4">
+          <p className="text-xs font-bold uppercase text-fta-black/70 mb-2">Sponsors</p>
+          <div className="flex flex-wrap gap-2 items-center">
+            {spotDetail.sponsors.map((s) => (
+              <div
+                key={s.brand_id}
+                className="flex items-center gap-2 px-2 py-1 border-2 border-fta-black bg-fta-paper"
+                title={s.display_name ?? "Brand"}
+              >
+                {s.avatar_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={s.avatar_url} alt="" className="w-8 h-8 object-cover border-2 border-fta-black" />
+                ) : (
+                  <span className="w-8 h-8 border-2 border-fta-black bg-fta-paper flex items-center justify-center text-xs font-bold">
+                    {(s.display_name ?? "B")[0]}
+                  </span>
+                )}
+                <span className="text-xs font-bold uppercase truncate max-w-[100px]">{s.display_name ?? "Brand"}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
-      <div className="flex flex-wrap gap-2 items-center mb-4">
+
+      <div className="flex flex-wrap gap-2 items-center">
         <button
           type="button"
           onClick={handleCheckIn}
@@ -83,29 +288,35 @@ function SpotCard({
         >
           {isCheckedIn ? "CHECKED IN" : "CHECK IN"}
         </button>
-        {spot.recent_check_ins.length > 0 && (
+        {liveRidersCount > 0 && (
           <div className="flex items-center gap-1">
             <span className="text-xs font-bold uppercase text-fta-black/70">Who&apos;s here:</span>
-            <div className="flex -space-x-2">
-              {Array.from(
-                new Map(spot.recent_check_ins.map((u) => [u.user_id, u])).values()
-              )
-                .slice(0, 8)
-                .map((u) => (
-                <div
-                  key={u.user_id}
-                  className="w-8 h-8 border-2 border-fta-black bg-fta-paper flex items-center justify-center text-xs font-bold overflow-hidden"
-                  title={u.display_name ?? "User"}
-                >
-                  {u.avatar_url ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-fta-black">{(u.display_name ?? "?")[0]}</span>
-                  )}
+            {canSeeNames ? (
+              visibleCheckIns.length > 0 ? (
+                <div className="flex -space-x-2">
+                  {visibleCheckIns.slice(0, 8).map((u) => (
+                    <div
+                      key={u.user_id}
+                      className="w-8 h-8 border-2 border-fta-black bg-fta-paper flex items-center justify-center text-xs font-bold overflow-hidden"
+                      title={u.display_name ?? "User"}
+                    >
+                      {u.avatar_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-fta-black">{(u.display_name ?? "?")[0]}</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : (
+                <span className="text-xs text-fta-black/60">Count only (ghost or outside radius)</span>
+              )
+            ) : (
+              <span className="text-xs text-fta-black/60">
+                {liveRidersCount} active — {viewerTier === "free" ? "check in to see who" : "move within 10 mi to see names"}
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -151,10 +362,10 @@ function ThemeDropdown({
         aria-expanded={open}
         aria-labelledby={labelId}
         onClick={() => setOpen((o) => !o)}
-        className="w-full px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium text-left flex items-center justify-between rounded-none"
+        className="w-full min-w-0 px-3 py-2 border-2 md:border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium text-left flex items-center justify-between gap-2 rounded-none min-h-[44px]"
       >
-        <span>{selectedLabel}</span>
-        <span className="text-fta-orange font-bold" aria-hidden>
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <span className="text-fta-orange font-bold shrink-0" aria-hidden>
           {open ? "▲" : "▼"}
         </span>
       </button>
@@ -162,7 +373,7 @@ function ThemeDropdown({
         <ul
           role="listbox"
           aria-labelledby={labelId}
-          className="absolute z-[1100] w-full mt-0 border-[3px] border-t-0 border-fta-black bg-fta-paper rounded-none max-h-48 overflow-y-auto"
+          className="absolute z-[1100] w-full mt-0 border-2 md:border-[3px] border-t-0 border-fta-black bg-fta-paper rounded-none max-h-48 overflow-y-auto"
         >
           {options.map((o) => (
             <li
@@ -173,7 +384,7 @@ function ThemeDropdown({
                 onChange(o.value);
                 setOpen(false);
               }}
-              className={`px-3 py-2 border-b-[3px] border-fta-black last:border-b-0 font-medium cursor-pointer rounded-none ${
+              className={`px-3 py-3 min-h-[44px] flex items-center border-b-2 md:border-b-[3px] border-fta-black last:border-b-0 font-medium cursor-pointer rounded-none ${
                 value === o.value
                   ? "bg-fta-orange text-fta-black"
                   : "bg-fta-paper text-fta-black hover:bg-fta-orange hover:text-fta-black"
@@ -199,6 +410,18 @@ function MapClickHandler({
       onContextMenu(e.latlng.lat, e.latlng.lng);
     },
   });
+  return null;
+}
+
+/** Keeps leaflet-gesture-handling in sync when resizing between mobile and desktop. */
+function SyncGestureHandling({ enabled }: { enabled: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    const m = map as L.Map & { gestureHandling?: { enable: () => void; disable: () => void } };
+    if (enabled) m.gestureHandling?.enable?.();
+    else m.gestureHandling?.disable?.();
+    return () => m.gestureHandling?.disable?.();
+  }, [map, enabled]);
   return null;
 }
 
@@ -240,26 +463,6 @@ function FlyToSearch({
 
 export type GeocodeSuggestion = { lat: number; lng: number; display_name: string };
 
-/** Approximate distance in km between two points (Haversine). */
-function distanceKm(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) *
-      Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
 /** Fetch address suggestions from OpenStreetMap Nominatim, sorted by distance from near (closest first). */
 async function geocodeSuggestions(
   query: string,
@@ -287,7 +490,8 @@ async function geocodeSuggestions(
   if (near) {
     list.sort(
       (a, b) =>
-        distanceKm(near.lat, near.lng, a.lat, a.lng) - distanceKm(near.lat, near.lng, b.lat, b.lng)
+        haversineDistanceKm(near, { lat: a.lat, lng: a.lng }) -
+        haversineDistanceKm(near, { lat: b.lat, lng: b.lng })
     );
   }
   return list;
@@ -431,25 +635,75 @@ const searchResultIcon = L.divIcon({
   iconAnchor: [13, 13],
 });
 
+type TrendHeatPoint = { spot_id: string; lat: number; lng: number; count: number };
+
 function MapInner({
   spots,
   setSpots,
   currentUserId,
+  viewerTier,
   initialCenter,
   initialZoom,
   userLocation,
   searchCenter,
+  trendHeatData,
+  showTrendOverlay,
 }: {
   spots: SpotWithStats[];
   setSpots: (s: SpotWithStats[] | ((prev: SpotWithStats[]) => SpotWithStats[])) => void;
   currentUserId: string | null;
+  viewerTier: MembershipTier;
   initialCenter: [number, number];
   initialZoom: number;
   userLocation: { lat: number; lng: number } | null;
   searchCenter: { lat: number; lng: number } | null;
+  trendHeatData: TrendHeatPoint[];
+  showTrendOverlay: boolean;
 }) {
   const [selectedSpot, setSelectedSpot] = useState<SpotWithStats | null>(null);
+  const [spotDetail, setSpotDetail] = useState<SpotDetail | null>(null);
   const [addSpotCoords, setAddSpotCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [{ mobileMapUx, cooperativeGestures }, setMapProfile] = useState(() => getMapInteractionProfile());
+
+  useEffect(() => {
+    function update() {
+      setMapProfile(getMapInteractionProfile());
+    }
+    update();
+
+    const mqNarrow = window.matchMedia("(max-width: 767px)");
+    const mqAnyFine = window.matchMedia("(any-pointer: fine)");
+    const mqPointer = window.matchMedia("(pointer: coarse)");
+    const mqAnyPointer = window.matchMedia("(any-pointer: coarse)");
+
+    mqNarrow.addEventListener("change", update);
+    mqAnyFine.addEventListener("change", update);
+    mqPointer.addEventListener("change", update);
+    mqAnyPointer.addEventListener("change", update);
+    window.addEventListener("resize", update);
+
+    return () => {
+      mqNarrow.removeEventListener("change", update);
+      mqAnyFine.removeEventListener("change", update);
+      mqPointer.removeEventListener("change", update);
+      mqAnyPointer.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSpot) {
+      setSpotDetail(null);
+      return;
+    }
+    let cancelled = false;
+    getSpotDetail(selectedSpot.id).then((detail) => {
+      if (!cancelled && detail) setSpotDetail(detail);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSpot]);
 
   const refreshSpots = useCallback(async () => {
     const next = await getSpotsWithStats();
@@ -457,12 +711,22 @@ function MapInner({
     if (selectedSpot) {
       const updated = next.find((s) => s.id === selectedSpot.id);
       if (updated) setSelectedSpot(updated);
+      if (spotDetail) {
+        const detail = await getSpotDetail(selectedSpot.id);
+        if (detail) setSpotDetail(detail);
+      }
     }
-  }, [selectedSpot, setSpots]);
+  }, [selectedSpot, spotDetail, setSpots]);
 
   const handleCheckIn = useCallback(() => {
     refreshSpots();
   }, [refreshSpots]);
+
+  const geofenceSpots = useMemo(
+    () => spots.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, radius_meters: s.radius_meters })),
+    [spots]
+  );
+  useGeofence({ enabled: !!currentUserId, spots: geofenceSpots, onSessionChange: refreshSpots });
 
   const orangeIcon = L.divIcon({
     className: "fta-marker",
@@ -484,11 +748,13 @@ function MapInner({
         center={userLocation ?? initialCenter}
         zoom={initialZoom}
         className="map-container h-full w-full"
+        attributionControl={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          attribution=""
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <SyncGestureHandling enabled={cooperativeGestures} />
         <LocateUser userLocation={userLocation} zoom={initialZoom} />
         <FlyToSearch searchCenter={searchCenter} zoom={initialZoom} />
         <MapClickHandler onContextMenu={(lat, lng) => setAddSpotCoords({ lat, lng })} />
@@ -498,6 +764,26 @@ function MapInner({
         {searchCenter && (
           <Marker position={[searchCenter.lat, searchCenter.lng]} icon={searchResultIcon} />
         )}
+        {showTrendOverlay && trendHeatData.length > 0 &&
+          trendHeatData.map((p) => {
+            const maxCount = Math.max(...trendHeatData.map((d) => d.count), 1);
+            const radius = 8 + (24 * p.count) / maxCount;
+            return (
+              <CircleMarker
+                key={p.spot_id}
+                center={[p.lat, p.lng]}
+                radius={radius}
+                pathOptions={{
+                  fillColor: "#FF5F1F",
+                  color: "#000",
+                  weight: 2,
+                  fillOpacity: 0.4,
+                  opacity: 0.8,
+                }}
+                eventHandlers={{ click: () => {} }}
+              />
+            );
+          })}
         {spots.map((spot) => (
           <Marker
             key={spot.id}
@@ -506,22 +792,87 @@ function MapInner({
             eventHandlers={{
               click: () => setSelectedSpot(spot),
             }}
-          />
+          >
+            {!mobileMapUx && (
+              <Tooltip
+                direction="top"
+                offset={[0, -14]}
+                opacity={1}
+                className="fta-spot-tooltip"
+              >
+                <div className="min-w-[200px] max-w-[320px] border-0">
+                  <p className="font-bold text-fta-black text-sm uppercase tracking-tight px-3 pt-2 pb-1 border-b-2 border-fta-orange break-words">
+                    {spot.name}
+                  </p>
+                  <p className="text-xs font-bold text-fta-black/80 uppercase px-3 py-1 break-words">
+                    {spot.sport} · {getSpotTypeLabel(spot.sport, spot.type)}
+                  </p>
+                  {spot.description && (
+                    <p className="text-xs text-fta-black/70 px-3 pb-2 break-words whitespace-normal max-h-[6.5rem] overflow-y-auto">
+                      {spot.description}
+                    </p>
+                  )}
+                  {(spot.active_now > 0 || spot.weekly_avg > 0 || !spot.description) && (
+                    <p className="text-xs font-bold text-fta-black/60 uppercase px-3 pb-2 break-words">
+                      {spot.active_now > 0 && `Active now: ${spot.active_now}`}
+                      {spot.active_now > 0 && spot.weekly_avg > 0 && " · "}
+                      {spot.weekly_avg > 0 && `Weekly avg: ${spot.weekly_avg}`}
+                      {!spot.description && spot.active_now === 0 && spot.weekly_avg === 0 && "Click for details"}
+                    </p>
+                  )}
+                </div>
+              </Tooltip>
+            )}
+          </Marker>
         ))}
       </MapContainer>
 
-      {selectedSpot && (
-        <SpotCard
-          spot={selectedSpot}
-          onCheckIn={handleCheckIn}
-          onClose={() => setSelectedSpot(null)}
+      {spotDetail && mobileMapUx ? (
+        <Drawer.Root
+          open={!!spotDetail}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedSpot(null);
+              setSpotDetail(null);
+            }
+          }}
+          snapPoints={[0.6, 0.9]}
+          modal
+        >
+          <Drawer.Portal>
+            <Drawer.Overlay className="bg-fta-black/50" />
+            <Drawer.Content className="rounded-t-none border-t-[3px] border-fta-black bg-fta-paper focus:outline-none">
+              <Drawer.Handle className="h-[3px] w-12 bg-fta-black rounded-none shrink-0 mx-auto mt-3 mb-1" />
+              <div className="overflow-y-auto max-h-[85vh] pb-6">
+                <SpotHub
+                  spotDetail={spotDetail}
+                  currentUserId={currentUserId}
+                  viewerTier={viewerTier}
+                  userLocation={userLocation}
+                  onCheckIn={handleCheckIn}
+                  onClose={() => {
+                    setSelectedSpot(null);
+                    setSpotDetail(null);
+                  }}
+                  embedded
+                />
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      ) : spotDetail ? (
+        <SpotHub
+          spotDetail={spotDetail}
           currentUserId={currentUserId}
-          isCheckedIn={
-            !!currentUserId &&
-            selectedSpot.recent_check_ins.some((c) => c.user_id === currentUserId)
-          }
+          viewerTier={viewerTier}
+          userLocation={userLocation}
+          onCheckIn={handleCheckIn}
+          onClose={() => {
+            setSelectedSpot(null);
+            setSpotDetail(null);
+          }}
         />
-      )}
+      ) : null}
 
       {addSpotCoords && (
         <AddSpotForm
@@ -541,9 +892,19 @@ function MapInner({
 const DEFAULT_CENTER: [number, number] = [34.0522, -118.2437];
 const DEFAULT_ZOOM = 10;
 
-export default function SpotMapClient() {
+export default function SpotMapClient({
+  currentUserId: initialCurrentUserId,
+  viewerTier,
+  viewerGhostMode,
+}: {
+  currentUserId: string | null;
+  viewerTier: MembershipTier;
+  viewerGhostMode: boolean;
+}) {
   const [spots, setSpots] = useState<SpotWithStats[]>([]);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(initialCurrentUserId ?? null);
+  const [ghostMode, setGhostMode] = useState(viewerGhostMode);
+  const [ghostLoading, setGhostLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -553,14 +914,46 @@ export default function SpotMapClient() {
   const [searchCenter, setSearchCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [trendOverlayOn, setTrendOverlayOn] = useState(false);
+  const [trendHeatData, setTrendHeatData] = useState<{ spot_id: string; lat: number; lng: number; count: number }[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [sportFilter, setSportFilter] = useState("");
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const filteredSpots = useMemo(() => {
+    if (!sportFilter) return spots;
+    if (sportFilter === MAP_FILTER_SNOW_SKI)
+      return spots.filter((s) => s.sport === "Snowboard" || s.sport === "Skiing");
+    return spots.filter((s) => s.sport === sportFilter);
+  }, [spots, sportFilter]);
+
+  const handleTrendOverlayToggle = useCallback(async () => {
+    if (viewerTier !== "brand") return;
+    const next = !trendOverlayOn;
+    setTrendOverlayOn(next);
+    if (next) {
+      setTrendLoading(true);
+      const data = await getTrendHeatData();
+      setTrendHeatData(data);
+      setTrendLoading(false);
+    } else {
+      setTrendHeatData([]);
+    }
+  }, [viewerTier, trendOverlayOn]);
+
+  useEffect(() => {
+    setCurrentUserId(initialCurrentUserId ?? null);
+  }, [initialCurrentUserId]);
+  useEffect(() => {
+    setGhostMode(viewerGhostMode);
+  }, [viewerGhostMode]);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      setCurrentUserId(user?.id ?? null);
+      setCurrentUserId(user?.id ?? initialCurrentUserId ?? null);
     });
-  }, []);
+  }, [initialCurrentUserId]);
 
   useEffect(() => {
     getSpotsWithStats().then((s) => {
@@ -667,13 +1060,19 @@ export default function SpotMapClient() {
   }, []);
 
   return (
-    <main className="h-screen flex flex-col bg-fta-paper">
-      <header className="border-b-[3px] border-fta-black px-4 py-3 flex items-center justify-between flex-shrink-0 flex-wrap gap-2">
-        <h1 className="text-xl font-bold uppercase tracking-tight text-fta-black border-b-[3px] border-fta-orange pb-1">
-          Spot Map
-        </h1>
-        <div ref={searchContainerRef} className="relative flex gap-0 flex-1 min-w-0 max-w-md">
-          <form onSubmit={handleSearch} className="flex gap-0 flex-1 min-w-0">
+    <main className="h-full flex flex-col bg-fta-paper min-h-0">
+      <header className="border-b-2 md:border-b-[3px] border-fta-black px-4 py-3 flex flex-col gap-3 flex-shrink-0 md:flex-row md:items-center md:justify-between md:flex-wrap md:gap-2">
+        <div className="w-full md:w-auto shrink-0 pb-1 border-b-2 md:border-b-[3px] border-fta-orange">
+          <BrandLogoFullLink
+            href="/"
+            priority
+            className="!inline-block"
+            logoClassName={BRAND_LOGO_MAP_HEADER_CLASS}
+          />
+          <span className="sr-only">Spot Map</span>
+        </div>
+        <div ref={searchContainerRef} className="relative flex gap-0 w-full min-w-0 md:flex-1 md:max-w-md order-2 md:order-none">
+          <form onSubmit={handleSearch} className="flex gap-0 flex-1 min-w-0 w-full">
             <input
               type="text"
               value={searchQuery}
@@ -683,21 +1082,21 @@ export default function SpotMapClient() {
               }}
               onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
               placeholder="Address or place"
-              className="flex-1 min-w-0 px-3 py-2 border-[3px] border-fta-black border-r-0 bg-fta-paper text-fta-black font-medium placeholder:text-fta-black/50 rounded-none"
+              className="flex-1 min-w-0 px-3 py-2.5 border-2 md:border-[3px] border-fta-black border-r-0 bg-fta-paper text-fta-black font-medium placeholder:text-fta-black/50 rounded-none text-base"
               aria-label="Search address or location"
               autoComplete="off"
             />
             <button
               type="submit"
               disabled={searchLoading}
-              className="px-4 py-2 border-[3px] border-fta-orange bg-fta-orange text-fta-black font-bold text-sm uppercase hover:bg-fta-paper hover:border-fta-black transition-colors disabled:opacity-50 rounded-none"
+              className="px-4 py-2.5 min-h-[44px] border-2 md:border-[3px] border-fta-orange bg-fta-orange text-fta-black font-bold text-sm uppercase hover:bg-fta-paper hover:border-fta-black transition-colors disabled:opacity-50 rounded-none"
             >
               {searchLoading ? "…" : "Search"}
             </button>
           </form>
           {showSuggestions && searchSuggestions.length > 0 && (
             <ul
-              className="absolute top-full left-0 right-0 z-[1100] mt-0 border-[3px] border-fta-black border-t-0 bg-fta-paper max-h-60 overflow-y-auto list-none p-0 m-0"
+              className="absolute top-full left-0 right-0 z-[1100] mt-0 border-2 md:border-[3px] border-fta-black border-t-0 bg-fta-paper max-h-60 overflow-y-auto list-none p-0 m-0"
               role="listbox"
               aria-label="Address suggestions"
             >
@@ -706,7 +1105,8 @@ export default function SpotMapClient() {
                   <button
                     type="button"
                     role="option"
-                    className="w-full text-left px-3 py-2 border-b-[3px] border-fta-black last:border-b-0 font-medium text-sm text-fta-black hover:bg-fta-orange hover:text-fta-black transition-colors rounded-none"
+                    aria-selected={false}
+                    className="w-full text-left px-3 py-3 min-h-[44px] border-b-2 md:border-b-[3px] border-fta-black last:border-b-0 font-medium text-sm text-fta-black hover:bg-fta-orange hover:text-fta-black transition-colors rounded-none"
                     onClick={() => handleSelectSuggestion(s)}
                   >
                     {s.display_name}
@@ -716,27 +1116,65 @@ export default function SpotMapClient() {
             </ul>
           )}
         </div>
-        <div className="flex gap-2 items-center flex-wrap">
+        <div className="flex flex-wrap gap-2 w-full min-w-0 md:w-auto order-3 md:order-none">
+          {viewerTier === "brand" && (
+            <button
+              type="button"
+              onClick={handleTrendOverlayToggle}
+              disabled={trendLoading}
+              className={`min-h-[44px] px-3 py-2 border-2 md:border-[3px] font-bold text-sm uppercase rounded-none transition-colors ${
+                trendOverlayOn
+                  ? "border-fta-orange bg-fta-orange text-fta-black"
+                  : "border-fta-black bg-fta-paper text-fta-black hover:bg-fta-orange hover:border-fta-orange"
+              }`}
+              aria-pressed={trendOverlayOn}
+              aria-label={trendOverlayOn ? "Trend overlay on (30-day heat)" : "Show trend overlay"}
+            >
+              {trendLoading ? "…" : trendOverlayOn ? "Trend on" : "Trend overlay"}
+            </button>
+          )}
+          {viewerTier === "pro" && (
+            <button
+              type="button"
+              onClick={async () => {
+                setGhostLoading(true);
+                const result = await updateGhostMode(!ghostMode);
+                setGhostLoading(false);
+                if (!result.error) setGhostMode(!ghostMode);
+              }}
+              disabled={ghostLoading}
+              className={`min-h-[44px] px-3 py-2 border-2 md:border-[3px] font-bold text-sm uppercase rounded-none transition-colors ${
+                ghostMode
+                  ? "border-fta-orange bg-fta-orange text-fta-black"
+                  : "border-fta-black bg-fta-paper text-fta-black hover:bg-fta-orange hover:border-fta-orange"
+              }`}
+              aria-pressed={ghostMode}
+              aria-label={ghostMode ? "Go Ghost on (hide name from others)" : "Go Ghost off"}
+            >
+              {ghostMode ? "Ghost on" : "Go Ghost"}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleMyLocation}
-            className="px-3 py-2 border-[3px] border-fta-orange bg-fta-orange text-fta-black font-bold text-sm uppercase hover:bg-fta-paper hover:border-fta-black transition-colors rounded-none"
+            className="min-h-[44px] px-3 py-2 border-2 md:border-[3px] border-fta-orange bg-fta-orange text-fta-black font-bold text-sm uppercase hover:bg-fta-paper hover:border-fta-black transition-colors rounded-none shrink-0"
             aria-label="Center on my location"
           >
             My location
           </button>
-          <Link
-            href="/"
-            className="px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-bold text-sm uppercase hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
-          >
-            Home
-          </Link>
-          <Link
-            href="/discovery"
-            className="px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-bold text-sm uppercase hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
-          >
-            Discovery
-          </Link>
+          <div className="min-w-0 flex-1 md:flex-none md:min-w-[140px]" aria-labelledby="map-sport-filter-label">
+            <span id="map-sport-filter-label" className="sr-only">
+              Filter spots by sport
+            </span>
+            <ThemeDropdown
+              id="map-sport-filter"
+              labelId="map-sport-filter-label"
+              options={MAP_SPORT_FILTER_OPTIONS}
+              value={sportFilter}
+              onChange={setSportFilter}
+              placeholder="All sports"
+            />
+          </div>
         </div>
       </header>
       {(locationError || searchError) && (
@@ -753,13 +1191,16 @@ export default function SpotMapClient() {
           </div>
         ) : (
           <MapInner
-            spots={spots}
+            spots={filteredSpots}
             setSpots={setSpots}
             currentUserId={currentUserId}
+            viewerTier={viewerTier}
             initialCenter={DEFAULT_CENTER}
             initialZoom={DEFAULT_ZOOM}
             userLocation={userLocation}
             searchCenter={searchCenter}
+            trendHeatData={trendHeatData}
+            showTrendOverlay={viewerTier === "brand" && trendOverlayOn}
           />
         )}
       </div>
