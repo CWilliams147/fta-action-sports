@@ -177,7 +177,7 @@ export default async function ProfilePage({
   const specLabel = specParts.length ? specParts.join(" · ") : null;
 
   return (
-    <main className="min-h-screen bg-fta-paper p-6 md:p-10 flex flex-col items-center">
+    <main className="min-h-screen overflow-y-auto bg-fta-paper p-6 pb-40 md:p-10 md:pb-32 flex flex-col items-center">
       <div className="w-full max-w-md border-2 border-fta-black bg-fta-paper overflow-hidden">
         {/* Pro Card – ID / trading card layout */}
         <div className="border-b-2 border-fta-black p-6">
@@ -263,7 +263,7 @@ export default async function ProfilePage({
           )}
         </div>
         {user && (
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-4 mt-4">
             <form action={signOutAction}>
               <button
                 type="submit"
@@ -278,7 +278,7 @@ export default async function ProfilePage({
 
       <ClipCatalog clips={(clips ?? []) as Clip[]} />
 
-      <div className="mt-10 pb-24 flex flex-col items-center gap-3 w-full max-w-md px-4">
+      <div className="mt-10 pb-32 flex flex-col items-center gap-3 w-full max-w-md px-4">
         <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
         <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
           FTA Action Sports
