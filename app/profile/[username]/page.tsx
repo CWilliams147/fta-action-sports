@@ -177,22 +177,23 @@ export default async function ProfilePage({
   const specLabel = specParts.length ? specParts.join(" · ") : null;
 
   return (
-    <main className="min-h-screen overflow-y-auto bg-fta-paper p-6 pb-40 md:p-10 md:pb-32 flex flex-col items-center">
-      <div className="w-full max-w-md border-2 border-fta-black bg-fta-paper overflow-hidden">
+    <main className="h-[calc(100vh-theme(spacing.24))] overflow-hidden bg-fta-paper p-4 md:p-8 flex flex-col items-center">
+      <div className="w-full max-w-md flex-1 min-h-0 flex flex-col justify-between">
+        <div className="w-full border-2 border-fta-black bg-fta-paper overflow-hidden">
         {/* Pro Card – ID / trading card layout */}
-        <div className="border-b-2 border-fta-black p-6">
+        <div className="border-b-2 border-fta-black p-4 md:p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-fta-black border-b-2 border-fta-orange pb-1 inline-block">
                 {profile.display_name || "Athlete"}
               </h1>
               {profile.sport_name && (
-                <p className="text-lg font-bold text-fta-black/80 mt-2">
+                <p className="text-base md:text-lg font-bold text-fta-black/80 mt-1.5">
                   {profile.sport_name}
                 </p>
               )}
               {specLabel && (
-                <p className="text-sm font-bold text-fta-black/70 mt-0.5">
+                <p className="text-xs md:text-sm font-bold text-fta-black/70 mt-0.5">
                   {specLabel}
                 </p>
               )}
@@ -216,7 +217,7 @@ export default async function ProfilePage({
           </div>
         )}
 
-        <div className="p-6 space-y-4 border-b-2 border-fta-black">
+        <div className="p-4 md:p-6 space-y-3 md:space-y-4 border-b-2 border-fta-black">
           {profile.home_town && (
             <p className="text-sm font-bold text-fta-black/80">
               <span className="text-fta-black/60">Home</span>{" "}
@@ -230,7 +231,7 @@ export default async function ProfilePage({
           )}
         </div>
 
-        <div className="p-4 border-b-2 border-fta-black">
+        <div className="p-3 md:p-4 border-b-2 border-fta-black">
           <AthleteDaps
             athleteId={profile.id}
             initialDapsCount={athleteDapsCount}
@@ -239,7 +240,7 @@ export default async function ProfilePage({
           />
         </div>
 
-        <div className="p-4 flex flex-wrap gap-2 border-t-2 border-fta-black">
+        <div className="p-3 md:p-4 flex flex-wrap gap-2 border-t-2 border-fta-black">
           <Link
             href="/discovery"
             className="px-4 py-2 border-2 border-fta-black bg-fta-orange text-fta-black font-bold hover:bg-fta-paper hover:border-fta-orange transition-colors rounded-none text-sm"
@@ -262,9 +263,11 @@ export default async function ProfilePage({
             </Link>
           )}
         </div>
-        {user && (
-          <div className="px-4 pb-4 mt-4">
-            <form action={signOutAction}>
+        </div>
+
+        <div className="mt-4 mb-4">
+          {user && (
+            <form action={signOutAction} className="mb-4">
               <button
                 type="submit"
                 className="w-full px-4 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-bold uppercase text-sm hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
@@ -272,17 +275,18 @@ export default async function ProfilePage({
                 Sign out
               </button>
             </form>
+          )}
+          <div className="flex flex-col items-center gap-2">
+            <BrandLogoFull className="h-9 sm:h-10 w-auto max-w-[240px] object-contain opacity-90" />
+            <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
+              FTA Action Sports
+            </p>
           </div>
-        )}
+        </div>
       </div>
 
-      <ClipCatalog clips={(clips ?? []) as Clip[]} />
-
-      <div className="mt-10 pb-32 flex flex-col items-center gap-3 w-full max-w-md px-4">
-        <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
-        <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
-          FTA Action Sports
-        </p>
+      <div className="hidden md:block w-full max-w-md mt-6">
+        <ClipCatalog clips={(clips ?? []) as Clip[]} />
       </div>
     </main>
   );
