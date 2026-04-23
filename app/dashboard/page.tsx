@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/auth/sign-in");
+    redirect("/auth/signin");
   }
   const { data: profile } = await supabase.from("profiles").select("username").eq("id", user.id).single();
   if (profile?.username) {

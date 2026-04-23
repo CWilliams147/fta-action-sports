@@ -10,7 +10,7 @@ export default async function ScoutLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/auth/sign-in?redirectTo=/scout");
+    redirect("/auth/signin?redirectTo=/scout");
   }
   const { data: profile } = await supabase
     .from("profiles")

@@ -1,35 +1,11 @@
-import Link from "next/link";
-import { SignInForm } from "../SignInForm";
-import { BrandLogoIcon } from "@/components/BrandLogo";
+import { redirect } from "next/navigation";
 
-export default async function SignInPage({
+export default async function SignInAliasPage({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-
-  return (
-    <main className="min-h-screen w-full bg-fta-paper flex items-center justify-center p-4 md:p-6">
-      <div
-        className="w-full max-w-md border-[3px] border-fta-black bg-fta-paper p-8"
-        style={{ boxShadow: "4px 4px 0 0 #000" }}
-      >
-        <div className="mb-4 flex items-center justify-center">
-          <BrandLogoIcon size={44} />
-        </div>
-        <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-fta-black border-b-[3px] border-fta-orange pb-2 mb-1">
-          Sign in
-        </h1>
-        <p className="text-fta-black/80 text-sm font-bold uppercase mb-6">Find the Adventure</p>
-        <SignInForm next={next ?? null} />
-        <p className="mt-6 text-sm font-bold text-fta-black/80">
-          No account?{" "}
-          <Link href="/auth/sign-up" className="text-fta-orange hover:underline">
-            Sign up
-          </Link>
-        </p>
-      </div>
-    </main>
-  );
+  const target = next ? `/auth/signin?next=${encodeURIComponent(next)}` : "/auth/signin";
+  redirect(target);
 }

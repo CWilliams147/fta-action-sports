@@ -38,12 +38,9 @@ export function SignUpForm({ next }: { next: string | null }) {
           className="w-full px-4 py-2.5 border-[3px] border-fta-black bg-fta-paper text-fta-black font-bold placeholder:text-fta-black/50 rounded-none"
         />
       </div>
-      {(state?.error || state?.success) && (
-        <p
-          className={`text-sm font-bold ${state.error ? "text-fta-black/90" : "text-fta-orange"}`}
-          role="alert"
-        >
-          {state.error ?? state.success}
+      {state?.error && (
+        <p className="text-sm font-bold text-fta-black/90" role="alert">
+          {state.error}
         </p>
       )}
       <button

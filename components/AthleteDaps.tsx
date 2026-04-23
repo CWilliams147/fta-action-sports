@@ -44,7 +44,7 @@ export function AthleteDaps({
   async function handleGiveDaps() {
     if (!currentUserId) {
       const redirectTo = encodeURIComponent(pathname ?? "/discovery");
-      window.location.href = `/auth/sign-in?redirectTo=${redirectTo}`;
+      window.location.href = `/auth/signin?redirectTo=${redirectTo}`;
       return;
     }
     if (currentUserId === athleteId) return; // cannot dap yourself

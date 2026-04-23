@@ -187,7 +187,7 @@ export function SiteNav({ className = "", initialUser = null }: SiteNavProps) {
           </div>
         ) : (
           <Link
-            href="/auth/sign-in"
+            href="/auth/signin"
             className="flex h-10 w-[200px] sm:w-[240px] flex-none items-center justify-center border-[3px] border-fta-orange bg-fta-paper text-fta-black font-black text-xs uppercase hover:bg-fta-orange hover:text-fta-black transition-colors"
           >
             SIGN IN

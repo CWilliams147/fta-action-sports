@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 import { SignUpForm } from "../SignUpForm";
 import { BrandLogoIcon } from "@/components/BrandLogo";
 
@@ -8,6 +10,14 @@ export default async function SignUpPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/map");
+  }
 
   return (
     <main className="min-h-screen w-full bg-fta-paper flex items-center justify-center p-4 md:p-6">
@@ -25,7 +35,7 @@ export default async function SignUpPage({
         <SignUpForm next={next ?? null} />
         <p className="mt-6 text-sm font-bold text-fta-black/80">
           Already have an account?{" "}
-          <Link href="/auth/sign-in" className="text-fta-orange hover:underline">
+          <Link href="/auth/signin" className="text-fta-orange hover:underline">
             Sign in
           </Link>
         </p>

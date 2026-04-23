@@ -10,7 +10,7 @@ export default async function MapPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/auth/sign-in?next=/map");
+    redirect("/auth/signin?next=/map");
   }
 
   const { data: profile } = await supabase

@@ -13,7 +13,7 @@ export default function ChooseAccountPage() {
   useEffect(() => {
     const check = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) router.replace("/auth/sign-in");
+      if (!user) router.replace("/auth/signin");
     };
     check();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount

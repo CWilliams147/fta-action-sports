@@ -46,7 +46,6 @@ export async function signUp(prevState: unknown, formData: FormData) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback` },
   });
 
   if (error) {
@@ -56,10 +55,16 @@ export async function signUp(prevState: unknown, formData: FormData) {
     return { error: error.message };
   }
 
-  // If session exists (e.g. email confirmation disabled), redirect
+  // If session exists, user is already authenticated.
   if (data.session) {
     redirect(getRedirectPath(next));
   }
 
-  return { success: "Check your email for the confirmation link." };
+  // Fallback: sign in right away so onboarding/testing doesn't require email confirmation.
+  const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+  if (signInError) {
+    return { error: signInError.message };
+  }
+
+  redirect(getRedirectPath(next));
 }

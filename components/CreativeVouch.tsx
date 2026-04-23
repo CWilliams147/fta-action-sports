@@ -25,7 +25,7 @@ export function CreativeVouch({
   async function handleVouch() {
     if (!currentUserId) {
       const redirectTo = encodeURIComponent(pathname ?? "/creatives");
-      window.location.href = `/auth/sign-in?redirectTo=${redirectTo}`;
+      window.location.href = `/auth/signin?redirectTo=${redirectTo}`;
       return;
     }
     if (currentUserId === creativeId) return;

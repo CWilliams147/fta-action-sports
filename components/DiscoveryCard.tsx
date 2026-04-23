@@ -42,7 +42,7 @@ export function DiscoveryCard({ clip, currentUserId }: DiscoveryCardProps) {
 
   async function handleGiveDaps() {
     if (!currentUserId) {
-      window.location.href = "/auth/sign-in?redirectTo=/discovery";
+      window.location.href = "/auth/signin?redirectTo=/discovery";
       return;
     }
     if (userHasDapped) return;

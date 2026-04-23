@@ -53,7 +53,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
-        router.replace("/auth/sign-in");
+        router.replace("/auth/signin");
         return;
       }
       supabase.from("profiles").select("account_type, sport_category").eq("id", user.id).single().then(({ data }) => {

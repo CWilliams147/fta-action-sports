@@ -74,13 +74,13 @@ export default function EditProfilePage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
-        router.replace("/auth/sign-in");
+        router.replace("/auth/signin");
         return;
       }
       supabase.from("profiles").select("*").eq("id", user.id).single().then(({ data: profile, error }) => {
         setFetching(false);
         if (error || !profile) {
-          router.replace("/auth/sign-in");
+          router.replace("/auth/signin");
           return;
         }
         setProfileId(profile.id);
