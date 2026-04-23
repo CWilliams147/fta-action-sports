@@ -397,17 +397,57 @@ function ThemeDropdown({
   );
 }
 
-function MapClickHandler({
-  onContextMenu,
+const LONG_PRESS_MS = 550;
+
+/**
+ * Add Spot gesture handler:
+ * - Double tap / double click anywhere on the map.
+ * - Long press on touch devices as fallback.
+ * Marker taps remain normal click events and still open SpotHub immediately.
+ */
+function MapAddSpotGestureHandler({
+  onAddSpot,
 }: {
-  onContextMenu: (lat: number, lng: number) => void;
+  onAddSpot: (lat: number, lng: number) => void;
 }) {
-  useMapEvents({
-    contextmenu(e) {
+  const map = useMap();
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearLongPressTimer() {
+    if (!longPressTimerRef.current) return;
+    clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  }
+
+  useEffect(() => {
+    const handleDblClick = (e: L.LeafletMouseEvent) => {
       e.originalEvent.preventDefault();
-      onContextMenu(e.latlng.lat, e.latlng.lng);
-    },
-  });
+      onAddSpot(e.latlng.lat, e.latlng.lng);
+    };
+    const handleTouchStart = (e: L.LeafletMouseEvent) => {
+      clearLongPressTimer();
+      longPressTimerRef.current = setTimeout(() => {
+        onAddSpot(e.latlng.lat, e.latlng.lng);
+      }, LONG_PRESS_MS);
+    };
+    const cancelLongPress = () => {
+      clearLongPressTimer();
+    };
+
+    map.on("dblclick", handleDblClick);
+    map.on("touchstart", handleTouchStart as L.LeafletEventHandlerFn);
+    map.on("touchmove", cancelLongPress as L.LeafletEventHandlerFn);
+    map.on("touchend", cancelLongPress as L.LeafletEventHandlerFn);
+
+    return () => {
+      map.off("dblclick", handleDblClick);
+      map.off("touchstart", handleTouchStart as L.LeafletEventHandlerFn);
+      map.off("touchmove", cancelLongPress as L.LeafletEventHandlerFn);
+      map.off("touchend", cancelLongPress as L.LeafletEventHandlerFn);
+      clearLongPressTimer();
+    };
+  }, [map, onAddSpot]);
+
   return null;
 }
 
@@ -656,6 +696,7 @@ function MapInner({
   searchCenter,
   trendHeatData,
   showTrendOverlay,
+  showAddSpotHint,
 }: {
   spots: SpotWithStats[];
   setSpots: (s: SpotWithStats[] | ((prev: SpotWithStats[]) => SpotWithStats[])) => void;
@@ -667,6 +708,7 @@ function MapInner({
   searchCenter: { lat: number; lng: number } | null;
   trendHeatData: TrendHeatPoint[];
   showTrendOverlay: boolean;
+  showAddSpotHint: boolean;
 }) {
   const [selectedSpot, setSelectedSpot] = useState<SpotWithStats | null>(null);
   const [spotDetail, setSpotDetail] = useState<SpotDetail | null>(null);
@@ -770,7 +812,7 @@ function MapInner({
         <SyncGestureHandling enabled={cooperativeGestures} />
         <LocateUser userLocation={userLocation} zoom={initialZoom} />
         <FlyToSearch searchCenter={searchCenter} zoom={initialZoom} />
-        <MapClickHandler onContextMenu={(lat, lng) => setAddSpotCoords({ lat, lng })} />
+        <MapAddSpotGestureHandler onAddSpot={(lat, lng) => setAddSpotCoords({ lat, lng })} />
         {userLocation && (
           <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon} />
         )}
@@ -839,6 +881,11 @@ function MapInner({
           </Marker>
         ))}
       </MapContainer>
+      {showAddSpotHint && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-[1001] -translate-x-1/2 border-[3px] border-fta-black bg-fta-paper px-3 py-2">
+          <p className="text-xs font-bold uppercase tracking-wide text-fta-black">Double-tap to add a spot</p>
+        </div>
+      )}
 
       {spotDetail && mobileMapUx ? (
         <Drawer.Root
@@ -931,6 +978,7 @@ export default function SpotMapClient({
   const [trendHeatData, setTrendHeatData] = useState<{ spot_id: string; lat: number; lng: number; count: number }[]>([]);
   const [trendLoading, setTrendLoading] = useState(false);
   const [sportFilter, setSportFilter] = useState("");
+  const [showAddSpotHint, setShowAddSpotHint] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const filteredSpots = useMemo(() => {
@@ -973,6 +1021,18 @@ export default function SpotMapClient({
       setSpots(s);
       setLoading(false);
     });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = "fta_map_add_spot_hint_seen_v1";
+    if (window.localStorage.getItem(key) === "1") return;
+    setShowAddSpotHint(true);
+    const timer = setTimeout(() => {
+      setShowAddSpotHint(false);
+      window.localStorage.setItem(key, "1");
+    }, 3600);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -1214,12 +1274,10 @@ export default function SpotMapClient({
             searchCenter={searchCenter}
             trendHeatData={trendHeatData}
             showTrendOverlay={viewerTier === "brand" && trendOverlayOn}
+            showAddSpotHint={showAddSpotHint}
           />
         )}
       </div>
-      <p className="text-xs font-bold uppercase text-fta-black/60 px-4 py-2 border-t-[3px] border-fta-black flex-shrink-0">
-        Right-click map to add a new spot · FTA Action Sports
-      </p>
     </main>
   );
 }

@@ -47,3 +47,8 @@ body {
     margin-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* App-style map presentation: hide Leaflet attribution watermark on map canvas. */
+.map-container .leaflet-control-attribution {
+  display: none !important;
+}
