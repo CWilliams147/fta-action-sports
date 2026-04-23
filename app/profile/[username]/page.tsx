@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -74,6 +74,13 @@ export default async function ProfilePage({
     .single();
 
   if (!profile) notFound();
+
+  async function signOutAction() {
+    "use server";
+    const supabaseForSignOut = await createClient();
+    await supabaseForSignOut.auth.signOut();
+    redirect("/auth/signin");
+  }
 
   if (profile.account_type === "brand") {
     const { BrandHub: BrandHubView } = await import("@/components/BrandHub");
@@ -255,11 +262,23 @@ export default async function ProfilePage({
             </Link>
           )}
         </div>
+        {user && (
+          <div className="px-4 pb-4">
+            <form action={signOutAction}>
+              <button
+                type="submit"
+                className="w-full px-4 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-bold uppercase text-sm hover:bg-fta-orange hover:border-fta-orange transition-colors rounded-none"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
       <ClipCatalog clips={(clips ?? []) as Clip[]} />
 
-      <div className="mt-10 flex flex-col items-center gap-3 w-full max-w-md px-4">
+      <div className="mt-10 pb-24 flex flex-col items-center gap-3 w-full max-w-md px-4">
         <BrandLogoFull className="h-10 sm:h-11 w-auto max-w-[260px] object-contain opacity-90" />
         <p className="text-xs font-bold uppercase tracking-wide text-fta-black/50 text-center">
           FTA Action Sports

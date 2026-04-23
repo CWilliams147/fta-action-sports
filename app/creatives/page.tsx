@@ -94,9 +94,9 @@ export default async function CreativesPage({
         <form
           action="/creatives"
           method="get"
-          className="mt-4 flex flex-wrap gap-2 items-stretch"
+          className="mt-4 flex flex-col md:flex-row md:flex-wrap items-stretch gap-3 md:gap-4"
         >
-          <div className="flex gap-0 flex-1 min-w-0 max-w-md h-[44px]">
+          <div className="flex gap-0 w-full min-w-0 h-[44px] md:flex-1 md:max-w-md">
             <input
               type="search"
               name="q"
@@ -117,13 +117,13 @@ export default async function CreativesPage({
             name="location"
             defaultValue={params.location ?? ""}
             placeholder="Location"
-            className="h-[44px] w-32 flex-shrink-0 px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium placeholder:text-fta-black/50"
+            className="h-[44px] w-full md:w-40 flex-shrink-0 px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium placeholder:text-fta-black/50"
             aria-label="Filter by location"
           />
           <select
             name="specialty"
             defaultValue={specialty ?? ""}
-            className="h-[44px] flex-shrink-0 min-w-0 px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium"
+            className="h-[44px] w-full md:w-48 flex-shrink-0 min-w-0 px-3 py-2 border-[3px] border-fta-black bg-fta-paper text-fta-black font-medium"
             aria-label="Filter by specialty"
           >
             <option value="">All specialties</option>
