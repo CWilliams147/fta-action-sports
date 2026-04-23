@@ -75,9 +75,7 @@ function getMapGesturesOverride(): "desktop" | "touch" | null {
 /**
  * Split mobile UI from gesture policy:
  * - mobileMapUx: layout (sheet, bottom nav) for narrow viewports or mobile UA.
- * - cooperativeGestures: leaflet-gesture-handling (two-finger pan). Use (any-pointer: fine)
- *   so a laptop mouse still counts while Chrome Device Mode spoofs coarse primary pointer.
- *   Optional ?mapGestures= overrides remain for edge cases.
+ * - cooperativeGestures: currently disabled to prioritize one-finger panning precision.
  */
 function getMapInteractionProfile(): {
   mobileMapUx: boolean;
@@ -100,10 +98,10 @@ function getMapInteractionProfile(): {
   const hasAnyFinePointer = window.matchMedia("(any-pointer: fine)").matches;
 
   const override = getMapGesturesOverride();
-  let cooperativeGestures: boolean;
+  let cooperativeGestures = false;
+  if (override === "touch") cooperativeGestures = true;
   if (override === "desktop") cooperativeGestures = false;
-  else if (override === "touch") cooperativeGestures = true;
-  else cooperativeGestures = mobileDevice && !hasAnyFinePointer;
+  if (!override && (mobileDevice || hasAnyFinePointer)) cooperativeGestures = false;
 
   return {
     mobileMapUx: narrow || mobileDevice,
@@ -422,6 +420,16 @@ function SyncGestureHandling({ enabled }: { enabled: boolean }) {
     else m.gestureHandling?.disable?.();
     return () => m.gestureHandling?.disable?.();
   }, [map, enabled]);
+  return null;
+}
+
+/** Ensure Leaflet tap handler is enabled on touch devices for responsive marker taps. */
+function EnsureTapEnabled() {
+  const map = useMap();
+  useEffect(() => {
+    const m = map as L.Map & { tap?: { enable: () => void } };
+    m.tap?.enable?.();
+  }, [map]);
   return null;
 }
 
@@ -748,12 +756,17 @@ function MapInner({
         center={userLocation ?? initialCenter}
         zoom={initialZoom}
         className="map-container h-full w-full"
-        attributionControl={false}
+        dragging
+        touchZoom="center"
+        doubleClickZoom={false}
+        scrollWheelZoom={false}
+        attributionControl
       >
         <TileLayer
-          attribution=""
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <EnsureTapEnabled />
         <SyncGestureHandling enabled={cooperativeGestures} />
         <LocateUser userLocation={userLocation} zoom={initialZoom} />
         <FlyToSearch searchCenter={searchCenter} zoom={initialZoom} />

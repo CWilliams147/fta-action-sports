@@ -40,3 +40,10 @@ body {
   overflow: visible;
   max-width: none;
 }
+
+/* Keep Leaflet controls visible above taller mobile bottom nav + safe area. */
+@media (max-width: 767px) {
+  .map-container .leaflet-bottom .leaflet-control {
+    margin-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
