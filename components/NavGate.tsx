@@ -6,11 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { SiteNav } from "@/components/SiteNav";
 import { MobileNav } from "@/components/MobileNav";
 
-/**
- * Renders SiteNav + MobileNav only when not on the public landing (/) as a guest.
- * On "/" with no user, no nav is shown so the hero starts at the top.
- * Client auth is subscribed so sign-in on the landing page shows nav without a full reload.
- */
+/** Hide navigation for all guest sessions. */
 export function NavGate({
   initialUser,
   children,
@@ -35,9 +31,7 @@ export function NavGate({
     return () => subscription.unsubscribe();
   }, []);
 
-  const isLandingGuest = pathname === "/" && !user;
-
-  if (isLandingGuest) {
+  if (!user) {
     return (
       <div className="flex-1 min-h-0 flex flex-col overflow-auto">
         {children}

@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const PROTECTED_PREFIXES = ["/map", "/scout", "/dashboard"];
+const PROTECTED_PREFIXES = ["/map", "/scout", "/dashboard", "/discovery", "/creatives"];
 
 function isProtectedPath(pathname: string): boolean {
   return PROTECTED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix + "/"));
@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
   const { response, user } = await updateSession(request);
 
   if (!user && isProtectedPath(request.nextUrl.pathname)) {
-    const signInUrl = new URL("/auth/sign-in", request.url);
+    const signInUrl = new URL("/auth/signin", request.url);
     signInUrl.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(signInUrl);
   }
