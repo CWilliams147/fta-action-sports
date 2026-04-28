@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { createClient } from "@/lib/supabase/server";
 import { NavGate } from "@/components/NavGate";
+import { IntroScreenGate } from "@/components/IntroScreen";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,7 +38,9 @@ export default async function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="h-screen flex flex-col overflow-hidden font-sans antialiased">
-        <NavGate initialUser={user ?? null}>{children}</NavGate>
+        <IntroScreenGate>
+          <NavGate initialUser={user ?? null}>{children}</NavGate>
+        </IntroScreenGate>
       </body>
     </html>
   );

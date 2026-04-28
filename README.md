@@ -1,6 +1,6 @@
 # FTA Action Sports
 
-**Forget the Algorithm.** Next.js app with Supabase auth, Athlete vs Brand accounts, and dynamic athlete sport logic (Stance / Foot Forward / Style by sport).
+**Find The Adventure.** Next.js app with Supabase auth, Athlete vs Brand accounts, and dynamic athlete sport logic (Stance / Foot Forward / Style by sport).
 
 ## Stack
 
@@ -16,7 +16,6 @@
    ```
 
 2. **Supabase**
-
    - Create a project at [supabase.com](https://supabase.com).
    - In **Authentication → URL Configuration**, set:
      - **Site URL**: `http://localhost:3000` (or your production URL)
@@ -31,7 +30,6 @@
    ```
 
    In `.env.local` set:
-
    - `NEXT_PUBLIC_SUPABASE_URL` = your project URL (Settings → API)
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your anon/public key
 
