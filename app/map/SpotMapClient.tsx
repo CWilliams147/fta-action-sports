@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import L from "leaflet";
 import { GestureHandling } from "leaflet-gesture-handling";
 import "leaflet-gesture-handling/dist/leaflet-gesture-handling.css";
 import { MapContainer, TileLayer, Marker, CircleMarker, Tooltip, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Drawer } from "vaul";
 import { BrandLogoFullLink, BRAND_LOGO_MAP_HEADER_CLASS } from "@/components/BrandLogo";
 import { createClient } from "@/lib/supabase/client";
 import type { SpotWithStats, SpotDetail } from "@/lib/types/database";
@@ -118,6 +118,7 @@ function SpotHub({
   onCheckIn,
   onClose,
   embedded,
+  loadingDetails = false,
 }: {
   spotDetail: SpotDetail;
   currentUserId: string | null;
@@ -126,6 +127,7 @@ function SpotHub({
   onCheckIn: () => void;
   onClose: () => void;
   embedded?: boolean;
+  loadingDetails?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const [liveRidersCount, setLiveRidersCount] = useState(spotDetail.active_now);
@@ -186,20 +188,28 @@ function SpotHub({
     <div
       className={
         embedded
-          ? "border-[3px] border-fta-black bg-fta-paper p-4 rounded-none max-h-[80vh] overflow-y-auto"
-          : "absolute bottom-4 left-4 right-4 z-[1000] border-[3px] border-fta-black bg-fta-paper p-4 rounded-none max-h-[80vh] overflow-y-auto"
+          ? "border-[3px] border-fta-black bg-fta-paper p-6 rounded-none max-h-[80vh] overflow-y-auto"
+          : "absolute bottom-4 left-4 right-4 z-[1000] border-[3px] border-fta-black bg-fta-paper p-6 rounded-none max-h-[80vh] overflow-y-auto"
       }
     >
       <div className="flex justify-between items-start gap-2 mb-3">
         <div>
-          <h2 className="text-lg font-bold uppercase tracking-tight text-fta-black">{spotDetail.name}</h2>
-          <p className="text-sm font-bold uppercase text-fta-orange">
+          <h2 className="text-2xl font-black uppercase tracking-tight text-fta-black">{spotDetail.name}</h2>
+          <span className="inline-block mt-1 px-2 py-1 border-2 border-fta-black bg-fta-orange text-fta-black text-xs font-bold uppercase">
             {spotDetail.sport} · {getSpotTypeLabel(spotDetail.sport, spotDetail.type)}
-          </p>
+          </span>
         </div>
-        <button type="button" onClick={onClose} className="text-fta-black font-bold hover:text-fta-orange" aria-label="Close">
-          ×
-        </button>
+        <div className="flex items-center gap-2">
+          {loadingDetails && (
+            <span className="inline-flex items-center gap-1 text-xs font-bold uppercase text-fta-black/70">
+              <span className="inline-block h-2 w-2 bg-fta-orange animate-pulse" aria-hidden />
+              Loading
+            </span>
+          )}
+          <button type="button" onClick={onClose} className="text-fta-black font-bold hover:text-fta-orange" aria-label="Close">
+            ×
+          </button>
+        </div>
       </div>
       <p className="text-sm font-bold uppercase tracking-wide text-fta-black mb-3" aria-live="polite">
         <span className="text-fta-orange" aria-hidden>
@@ -319,6 +329,60 @@ function SpotHub({
         )}
       </div>
     </div>
+  );
+}
+
+function SpotDialog({
+  open,
+  mobile,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  mobile: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
+
+  if (!mounted || !open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9998]" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        aria-label="Close spot dialog"
+        onClick={onClose}
+        className="absolute inset-0 bg-fta-black/50"
+      />
+      {mobile ? (
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          <div className="max-h-[90vh] overflow-hidden border-[3px] border-fta-black bg-white text-black shadow-[6px_6px_0_0_#000]">
+            {children}
+          </div>
+        </div>
+      ) : (
+        <div className="absolute left-1/2 top-1/2 w-full max-w-xl -translate-x-1/2 -translate-y-1/2 px-4">
+          <div className="max-h-[90vh] overflow-hidden border-[3px] border-fta-black bg-white text-black shadow-[8px_8px_0_0_#000]">
+            {children}
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -755,6 +819,16 @@ function MapInner({
     };
   }, [selectedSpot]);
 
+  const displaySpotDetail = useMemo<SpotDetail | null>(() => {
+    if (spotDetail) return spotDetail;
+    if (!selectedSpot) return null;
+    return {
+      ...selectedSpot,
+      leaderboard_this_month: [],
+      sponsors: [],
+    };
+  }, [spotDetail, selectedSpot]);
+
   const refreshSpots = useCallback(async () => {
     const next = await getSpotsWithStats();
     setSpots(next);
@@ -797,7 +871,7 @@ function MapInner({
       <MapContainer
         center={userLocation ?? initialCenter}
         zoom={initialZoom}
-        className="map-container h-full w-full"
+        className="map-container absolute inset-0 h-full w-full"
         dragging
         touchZoom="center"
         doubleClickZoom={false}
@@ -887,52 +961,30 @@ function MapInner({
         </div>
       )}
 
-      {spotDetail && mobileMapUx ? (
-        <Drawer.Root
-          open={!!spotDetail}
-          onOpenChange={(open) => {
-            if (!open) {
+      <SpotDialog
+        open={!!selectedSpot}
+        mobile={mobileMapUx}
+        onClose={() => {
+          setSelectedSpot(null);
+          setSpotDetail(null);
+        }}
+      >
+        {displaySpotDetail ? (
+          <SpotHub
+            spotDetail={displaySpotDetail}
+            currentUserId={currentUserId}
+            viewerTier={viewerTier}
+            userLocation={userLocation}
+            loadingDetails={!spotDetail}
+            onCheckIn={handleCheckIn}
+            onClose={() => {
               setSelectedSpot(null);
               setSpotDetail(null);
-            }
-          }}
-          snapPoints={[0.6, 0.9]}
-          modal
-        >
-          <Drawer.Portal>
-            <Drawer.Overlay className="bg-fta-black/50" />
-            <Drawer.Content className="rounded-t-none border-t-[3px] border-fta-black bg-fta-paper focus:outline-none">
-              <Drawer.Handle className="h-[3px] w-12 bg-fta-black rounded-none shrink-0 mx-auto mt-3 mb-1" />
-              <div className="overflow-y-auto max-h-[85vh] pb-6">
-                <SpotHub
-                  spotDetail={spotDetail}
-                  currentUserId={currentUserId}
-                  viewerTier={viewerTier}
-                  userLocation={userLocation}
-                  onCheckIn={handleCheckIn}
-                  onClose={() => {
-                    setSelectedSpot(null);
-                    setSpotDetail(null);
-                  }}
-                  embedded
-                />
-              </div>
-            </Drawer.Content>
-          </Drawer.Portal>
-        </Drawer.Root>
-      ) : spotDetail ? (
-        <SpotHub
-          spotDetail={spotDetail}
-          currentUserId={currentUserId}
-          viewerTier={viewerTier}
-          userLocation={userLocation}
-          onCheckIn={handleCheckIn}
-          onClose={() => {
-            setSelectedSpot(null);
-            setSpotDetail(null);
-          }}
-        />
-      ) : null}
+            }}
+            embedded
+          />
+        ) : null}
+      </SpotDialog>
 
       {addSpotCoords && (
         <AddSpotForm
